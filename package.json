@@ -1,0 +1,25 @@
+{
+  "name": "madanapalle-live-tracker",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "build:pages": "npm run collect && npm run build",
+    "preview": "vite preview",
+    "collect": "node scripts/collect.mjs",
+    "collect:tomorrow": "node scripts/collect.mjs --tomorrow",
+    "collect:today": "node scripts/collect.mjs --today",
+    "collect:sample": "node scripts/collect.mjs --sample"
+  },
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.4",
+    "playwright": "^1.54.1",
+    "vite": "^5.4.19"
+  }
+}
