@@ -24,6 +24,38 @@ function ticketLabel(value) {
   return `${number(count)} ticket${count === 1 ? "" : "s"}`;
 }
 
+async function fetchJson(url) {
+  const response = await fetch(url, { cache: "no-store" });
+  if (!response.ok) {
+    throw new Error(`Failed to load data: ${response.status}`);
+  }
+
+  return response.json();
+}
+
+async function loadRuntimeConfig() {
+  try {
+    return await fetchJson(`./runtime-config.json?ts=${Date.now()}`);
+  } catch {
+    return {};
+  }
+}
+
+function normalizeLiveApiBase(config) {
+  const value = String(config?.liveApiBase || "").trim();
+  return value ? value.replace(/\/$/, "") : "";
+}
+
+function annotateClientSource(data, source) {
+  return {
+    ...data,
+    meta: {
+      ...(data.meta || {}),
+      clientSource: source
+    }
+  };
+}
+
 function formatGeneratedAt(data) {
   const raw = data?.generatedAt;
   if (!raw) return data?.generatedAtLabel || "Unknown";
@@ -129,8 +161,55 @@ function useDashboardData() {
     refreshing: false
   });
 
+  const loadDashboard = React.useCallback(async () => {
+    const config = await loadRuntimeConfig();
+    const liveApiBase = normalizeLiveApiBase(config);
+
+    if (liveApiBase) {
+      try {
+        const liveData = await fetchJson(`${liveApiBase}/api/live?date=today&ts=${Date.now()}`);
+        return {
+          ok: true,
+          data: annotateClientSource(liveData, {
+            mode: "live-proxy",
+            liveApiBase
+          })
+        };
+      } catch (error) {
+        const snapshot = await fetchJson(`./data/latest.json?ts=${Date.now()}`);
+        const fallback = annotateClientSource(snapshot, {
+          mode: "published-snapshot",
+          liveApiBase,
+          fallbackReason: error.message
+        });
+
+        return {
+          ok: true,
+          data: {
+            ...fallback,
+            meta: {
+              ...(fallback.meta || {}),
+              notes: [
+                `Live proxy fallback: ${error.message}`,
+                ...((fallback.meta && fallback.meta.notes) || [])
+              ]
+            }
+          }
+        };
+      }
+    }
+
+    const snapshot = await fetchJson(`./data/latest.json?ts=${Date.now()}`);
+    return {
+      ok: true,
+      data: annotateClientSource(snapshot, {
+        mode: "published-snapshot",
+        liveApiBase: ""
+      })
+    };
+  }, []);
+
   const loadData = React.useCallback((mode = "initial") => {
-    const snapshotUrl = `./data/latest.json?ts=${Date.now()}`;
     const isInitial = mode === "initial";
 
     setState((current) => ({
@@ -140,17 +219,9 @@ function useDashboardData() {
       error: null
     }));
 
-    return fetch(snapshotUrl, { cache: "no-store" })
-      .then((response) => {
-        if (!response.ok) {
-          throw new Error(`Failed to load data: ${response.status}`);
-        }
-
-        return response.json();
-      })
-      .then((data) => ({ ok: true, data }))
+    return loadDashboard()
       .catch((error) => ({ ok: false, error }));
-  }, []);
+  }, [loadDashboard]);
 
   React.useEffect(() => {
     let active = true;
@@ -347,6 +418,16 @@ function App() {
   const theatres = data.theatres || [];
   const generatedLabel = formatGeneratedAt(data);
   const ageLabel = snapshotAgeLabel(data.generatedAt);
+  const clientSource = data.meta?.clientSource || {};
+  const isLiveProxy = clientSource.mode === "live-proxy";
+  const refreshButtonLabel = refreshing
+    ? "Refreshing..."
+    : isLiveProxy
+      ? "Refresh live data"
+      : "Check for newer snapshot";
+  const sourceNote = isLiveProxy
+    ? "Each page refresh asks the live proxy for current seat counts."
+    : "Browser refresh only reloads the latest published JSON. On GitHub Pages, new numbers appear after the collector runs and a fresh deploy is published.";
 
   return (
     <main className="app-shell">
@@ -361,12 +442,9 @@ function App() {
           </p>
           <div className="hero__actions">
             <button className="refresh-button" onClick={refresh} disabled={refreshing}>
-              {refreshing ? "Checking..." : "Check for newer snapshot"}
+              {refreshButtonLabel}
             </button>
-            <p className="hero__note">
-              Browser refresh only reloads the latest published JSON. On GitHub Pages, new numbers
-              appear after the collector runs and a fresh deploy is published.
-            </p>
+            <p className="hero__note">{sourceNote}</p>
           </div>
         </div>
         <div className="hero__meta">
@@ -378,6 +456,10 @@ function App() {
             <span>Snapshot Generated</span>
             <strong>{generatedLabel}</strong>
             <small>{ageLabel}</small>
+          </div>
+          <div className="meta-pill">
+            <span>Source Mode</span>
+            <strong>{isLiveProxy ? "Live Proxy" : "Published Snapshot"}</strong>
           </div>
           <div className="meta-pill">
             <span>Timezone</span>
