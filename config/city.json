@@ -1,0 +1,48 @@
+{
+  "city": {
+    "name": "Madanapalle",
+    "regionCode": "MDNP",
+    "timezone": "Asia/Kolkata",
+    "slug": "madanapalle",
+    "country": "India",
+    "state": "Andhra Pradesh"
+  },
+  "theatres": [
+    {
+      "name": "ASR A/C 4K Laser Dolby Surround 7.1: Madanapalle",
+      "shortName": "ASR",
+      "venueCode": "ASRM",
+      "slug": "asr-a-c-4k-laser-dolby-surround-71-madanapalle",
+      "fallbackCutoffMinutes": 15
+    },
+    {
+      "name": "Ravi A/C 4K Laser Dolby Surround 7.1: Madanapalle",
+      "shortName": "Ravi",
+      "venueCode": "RTDM",
+      "slug": "ravi-a-c-4k-laser-dolby-surround-71-madanapalle",
+      "fallbackCutoffMinutes": 15
+    },
+    {
+      "name": "Siddartha Cinemas:Screen 2 Dolby Laser,Madanapalle",
+      "shortName": "Siddartha",
+      "venueCode": "MSDR",
+      "slug": "siddartha-cinemasscreen-2-dolby-lasermadanapalle",
+      "fallbackCutoffMinutes": 30
+    },
+    {
+      "name": "Sri Krishna A/C 4K Dolby Atmos: Madanapalle",
+      "shortName": "Sri Krishna",
+      "venueCode": "SKMD",
+      "slug": "sri-krishna-a-c-4k-dolby-atmos-madanapalle",
+      "fallbackCutoffMinutes": 15
+    },
+    {
+      "name": "Sunil A/C 4K Laser Dolby Surround 7.1: Madanapalle",
+      "shortName": "Sunil",
+      "venueCode": "SUTD",
+      "slug": "sunil-ac-4k-laser-dolby-surround-71-madanapalle",
+      "fallbackCutoffMinutes": 15,
+      "active": false
+    }
+  ]
+}
