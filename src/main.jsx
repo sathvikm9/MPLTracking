@@ -256,6 +256,49 @@ function buildDateOptions() {
   });
 }
 
+function isSupportedDate(isoDate, dateOptions) {
+  return dateOptions.some((option) => option.value === isoDate);
+}
+
+function getInitialSelectedDate(dateOptions) {
+  if (typeof window === "undefined") {
+    return dateOptions[0]?.value || getLocalTodayIso();
+  }
+
+  const urlDate = new URLSearchParams(window.location.search).get("date");
+  if (urlDate && isSupportedDate(urlDate, dateOptions)) {
+    return urlDate;
+  }
+
+  return dateOptions[0]?.value || getLocalTodayIso();
+}
+
+function getInitialSelectedTheatre() {
+  if (typeof window === "undefined") return "ALL";
+
+  const urlTheatre = new URLSearchParams(window.location.search).get("theatre");
+  if (THEATRE_OPTIONS.some((option) => option.value === urlTheatre)) {
+    return urlTheatre;
+  }
+
+  return "ALL";
+}
+
+function syncSelectionToUrl(selectedDate, selectedTheatre) {
+  if (typeof window === "undefined") return;
+
+  const url = new URL(window.location.href);
+  url.searchParams.set("date", selectedDate);
+
+  if (selectedTheatre === "ALL") {
+    url.searchParams.delete("theatre");
+  } else {
+    url.searchParams.set("theatre", selectedTheatre);
+  }
+
+  window.history.replaceState({}, "", `${url.pathname}?${url.searchParams.toString()}${url.hash}`);
+}
+
 function formatGeneratedAt(data) {
   const raw = data?.generatedAt;
   if (!raw) return data?.generatedAtLabel || "Unknown";
@@ -645,9 +688,13 @@ function MovieWiseBoard({ shows, emptyMessage }) {
 
 function App() {
   const dateOptions = buildDateOptions();
-  const [selectedDate, setSelectedDate] = React.useState(dateOptions[0]?.value || getLocalTodayIso());
-  const [selectedTheatre, setSelectedTheatre] = React.useState("ALL");
+  const [selectedDate, setSelectedDate] = React.useState(() => getInitialSelectedDate(dateOptions));
+  const [selectedTheatre, setSelectedTheatre] = React.useState(getInitialSelectedTheatre);
   const { loading, error, data, refreshing, refresh } = useDashboardData(selectedDate);
+
+  React.useEffect(() => {
+    syncSelectionToUrl(selectedDate, selectedTheatre);
+  }, [selectedDate, selectedTheatre]);
 
   if (loading) {
     return (
