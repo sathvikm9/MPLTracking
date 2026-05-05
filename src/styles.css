@@ -94,6 +94,35 @@ body::before {
   color: var(--ink-soft);
 }
 
+.hero__actions {
+  margin-top: 18px;
+}
+
+.refresh-button {
+  border: 0;
+  border-radius: 999px;
+  padding: 12px 18px;
+  background: linear-gradient(135deg, #161514, #3b3530);
+  color: #fff;
+  font-family: "Space Grotesk", sans-serif;
+  font-size: 0.92rem;
+  cursor: pointer;
+  box-shadow: 0 14px 28px rgba(22, 21, 20, 0.18);
+}
+
+.refresh-button:disabled {
+  cursor: wait;
+  opacity: 0.72;
+}
+
+.hero__note {
+  max-width: 52ch;
+  margin: 10px 0 0;
+  font-size: 0.92rem;
+  line-height: 1.6;
+  color: var(--ink-soft);
+}
+
 .hero__meta {
   display: grid;
   gap: 12px;
@@ -117,6 +146,12 @@ body::before {
   display: block;
   margin-top: 6px;
   font-size: 1rem;
+}
+
+.meta-pill small {
+  display: block;
+  margin-top: 6px;
+  color: var(--ink-soft);
 }
 
 .stats-grid {
