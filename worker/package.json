@@ -1,0 +1,9 @@
+{
+  "name": "mpltracking-live-worker",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy"
+  }
+}
