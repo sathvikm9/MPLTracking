@@ -365,6 +365,30 @@ function buildEmptyOutputFromBaseline(baseline, targetDate, notes = []) {
   };
 }
 
+function filterOutputByVenueCode(output, venueCode) {
+  if (!venueCode) return output;
+
+  const shows = (output.shows || []).filter((show) => show.venueCode === venueCode);
+  const notes = [...(output.meta?.notes || [])];
+
+  if (!shows.length) {
+    notes.push(`No shows were found for selected theatre ${venueCode}.`);
+  }
+
+  return {
+    ...output,
+    summary: buildSummary(shows),
+    movies: summarizeByMovie(shows),
+    theatres: summarizeByTheatre(shows),
+    shows,
+    meta: {
+      ...(output.meta || {}),
+      selectedVenueCode: venueCode,
+      notes
+    }
+  };
+}
+
 async function fetchBaselineSnapshot(fetchImpl, baseUrl, date) {
   const normalizedBaseUrl = String(baseUrl || DEFAULT_SNAPSHOT_BASE_URL).replace(/\/$/, "");
   const fileName = date && date !== "today" ? `history/${date}.json` : "latest.json";
@@ -423,6 +447,7 @@ export async function buildLiveSnapshot({
 }) {
   const url = new URL(requestUrl);
   const date = url.searchParams.get("date");
+  const venueCode = url.searchParams.get("venueCode");
   let baseline;
 
   try {
@@ -433,13 +458,16 @@ export async function buildLiveSnapshot({
     }
 
     const latestBaseline = await fetchBaselineSnapshot(fetchImpl, snapshotBaseUrl, "today");
-    return buildEmptyOutputFromBaseline(latestBaseline, date, [
-      `No published baseline was found for ${date}.`,
-      "No shows were found for the selected date."
-    ]);
+    return filterOutputByVenueCode(
+      buildEmptyOutputFromBaseline(latestBaseline, date, [
+        `No published baseline was found for ${date}.`,
+        "No shows were found for the selected date."
+      ]),
+      venueCode
+    );
   }
 
-  return refreshLiveSnapshot(baseline, fetchImpl);
+  return filterOutputByVenueCode(await refreshLiveSnapshot(baseline, fetchImpl), venueCode);
 }
 
 export function buildHealthPayload() {

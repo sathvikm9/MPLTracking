@@ -396,7 +396,7 @@ function buildMovieWiseGroups(shows) {
     );
 }
 
-function useDashboardData(selectedDate) {
+function useDashboardData(selectedDate, selectedTheatre) {
   const [state, setState] = React.useState({
     loading: true,
     error: null,
@@ -417,9 +417,15 @@ function useDashboardData(selectedDate) {
 
     if (liveApiBase) {
       try {
-        const liveData = await fetchJson(
-          `${liveApiBase}/api/live?date=${proxyDateParam}&ts=${Date.now()}`
-        );
+        const liveUrl = new URL(`${liveApiBase}/api/live`);
+        liveUrl.searchParams.set("date", proxyDateParam);
+        liveUrl.searchParams.set("ts", String(Date.now()));
+
+        if (selectedTheatre !== "ALL") {
+          liveUrl.searchParams.set("venueCode", selectedTheatre);
+        }
+
+        const liveData = await fetchJson(liveUrl.toString());
         if (liveData.targetDate !== selectedDate) {
           throw new Error(
             `Live proxy returned ${liveData.targetDate || "unknown date"} for ${selectedDate}`
@@ -431,7 +437,8 @@ function useDashboardData(selectedDate) {
           data: annotateClientSource(liveData, {
             mode: "live-proxy",
             liveApiBase,
-            selectedDate
+            selectedDate,
+            selectedTheatre
           })
         };
       } catch (error) {
@@ -441,6 +448,7 @@ function useDashboardData(selectedDate) {
             mode: "published-snapshot",
             liveApiBase,
             selectedDate,
+            selectedTheatre,
             fallbackReason: error.message
           });
 
@@ -469,6 +477,7 @@ function useDashboardData(selectedDate) {
                 mode: "live-proxy",
                 liveApiBase,
                 selectedDate,
+                selectedTheatre,
                 fallbackReason: error.message
               }
             )
@@ -484,7 +493,8 @@ function useDashboardData(selectedDate) {
         data: annotateClientSource(snapshot, {
           mode: "published-snapshot",
           liveApiBase: "",
-          selectedDate
+          selectedDate,
+          selectedTheatre
         })
       };
     } catch (error) {
@@ -497,17 +507,18 @@ function useDashboardData(selectedDate) {
               "The selected date does not have a published snapshot yet."
             ]),
             {
-              mode: "published-snapshot",
-              liveApiBase: "",
-              selectedDate
-            }
-          )
+            mode: "published-snapshot",
+            liveApiBase: "",
+            selectedDate,
+            selectedTheatre
+          }
+        )
         };
       }
 
       throw error;
     }
-  }, [selectedDate]);
+  }, [selectedDate, selectedTheatre]);
 
   const loadData = React.useCallback(
     (mode = "initial") => {
@@ -690,7 +701,10 @@ function App() {
   const dateOptions = buildDateOptions();
   const [selectedDate, setSelectedDate] = React.useState(() => getInitialSelectedDate(dateOptions));
   const [selectedTheatre, setSelectedTheatre] = React.useState(getInitialSelectedTheatre);
-  const { loading, error, data, refreshing, refresh } = useDashboardData(selectedDate);
+  const { loading, error, data, refreshing, refresh } = useDashboardData(
+    selectedDate,
+    selectedTheatre
+  );
 
   React.useEffect(() => {
     syncSelectionToUrl(selectedDate, selectedTheatre);
@@ -739,7 +753,7 @@ function App() {
       ? "Refresh live data"
       : "Check for newer snapshot";
   const sourceNote = isLiveProxy
-    ? "Each page refresh asks the live proxy for current seat counts."
+    ? "Each date selection, theatre selection, and refresh asks the live proxy for current BookMyShow seat counts."
     : "Browser refresh only reloads the latest published JSON. On GitHub Pages, new numbers appear after the collector runs and a fresh deploy is published.";
   const selectedTheatreLabel =
     THEATRE_OPTIONS.find((option) => option.value === selectedTheatre)?.label || "All Theatres";
