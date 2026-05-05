@@ -1,0 +1,6 @@
+name = "mpltracking-live"
+main = "src/index.js"
+compatibility_date = "2026-05-05"
+
+[vars]
+SNAPSHOT_BASE_URL = "https://sathvikm9.github.io/MPLTracking/data"
