@@ -1,12 +1,16 @@
 const SHOWTIME_API_BASE_URLS = [
-  "https://bms-india.vercel.app/api/showtimes",
   "https://bms-india2.vercel.app/api/showtimes",
-  "https://bms-india3.vercel.app/api/showtimes"
+  "https://bms-india3.vercel.app/api/showtimes",
+  "https://bms-india.vercel.app/api/showtimes"
 ];
+const SHOWTIME_API_RETRY_ROUNDS = 3;
+const SHOWTIME_API_RETRY_DELAY_MS = 700;
 
 const SHOWTIME_API_HEADERS = {
   accept: "application/json, text/plain, */*",
+  "cache-control": "no-cache",
   origin: "https://boxoffice24.pages.dev",
+  pragma: "no-cache",
   referer: "https://boxoffice24.pages.dev/",
   "user-agent":
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36"
@@ -21,6 +25,10 @@ function toNumber(value) {
   const cleaned = String(value).replace(/[^\d.-]/g, "");
   const parsed = Number(cleaned);
   return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 function normalizeMovieGenres(eventGenre) {
@@ -87,30 +95,38 @@ function buildSnapshotFromCategories(show, categories, method) {
 async function fetchShowtimeApiPayload(eventCode, regionCode, dateCode, fetchImpl) {
   let lastError = null;
 
-  for (const baseUrl of SHOWTIME_API_BASE_URLS) {
-    try {
-      const url = new URL(baseUrl);
-      url.searchParams.set("eventCode", eventCode);
-      url.searchParams.set("regionCode", regionCode);
-      url.searchParams.set("dateCode", dateCode);
+  for (let round = 0; round < SHOWTIME_API_RETRY_ROUNDS; round += 1) {
+    for (const baseUrl of SHOWTIME_API_BASE_URLS) {
+      try {
+        const url = new URL(baseUrl);
+        url.searchParams.set("eventCode", eventCode);
+        url.searchParams.set("regionCode", regionCode);
+        url.searchParams.set("dateCode", dateCode);
+        url.searchParams.set("_", `${Date.now()}-${round}`);
 
-      const response = await fetchImpl(url, {
-        headers: SHOWTIME_API_HEADERS
-      });
-      const payload = await response.text();
+        const response = await fetchImpl(url, {
+          cache: "no-store",
+          headers: SHOWTIME_API_HEADERS
+        });
+        const payload = await response.text();
 
-      if (!response.ok) {
-        throw new Error(`${response.status} ${response.statusText}: ${payload.slice(0, 200)}`);
+        if (!response.ok) {
+          throw new Error(`${response.status} ${response.statusText}: ${payload.slice(0, 200)}`);
+        }
+
+        const parsed = JSON.parse(payload);
+        if (!Array.isArray(parsed?.ShowDetails)) {
+          throw new Error("Missing ShowDetails in showtime payload");
+        }
+
+        return parsed;
+      } catch (error) {
+        lastError = error;
       }
+    }
 
-      const parsed = JSON.parse(payload);
-      if (!Array.isArray(parsed?.ShowDetails)) {
-        throw new Error("Missing ShowDetails in showtime payload");
-      }
-
-      return parsed;
-    } catch (error) {
-      lastError = error;
+    if (round < SHOWTIME_API_RETRY_ROUNDS - 1) {
+      await sleep(SHOWTIME_API_RETRY_DELAY_MS * (round + 1));
     }
   }
 
@@ -370,6 +386,7 @@ function filterOutputByVenueCode(output, venueCode) {
 
   const shows = (output.shows || []).filter((show) => show.venueCode === venueCode);
   const notes = [...(output.meta?.notes || [])];
+  const liveShowCount = shows.filter((show) => show.source?.method === "live-proxy-showtimes").length;
 
   if (!shows.length) {
     notes.push(`No shows were found for selected theatre ${venueCode}.`);
@@ -384,6 +401,13 @@ function filterOutputByVenueCode(output, venueCode) {
     meta: {
       ...(output.meta || {}),
       selectedVenueCode: venueCode,
+      liveRefresh: output.meta?.liveRefresh
+        ? {
+            ...output.meta.liveRefresh,
+            liveShowCount,
+            fallbackShowCount: shows.length - liveShowCount
+          }
+        : undefined,
       notes
     }
   };
@@ -414,6 +438,8 @@ async function refreshLiveSnapshot(baseline, fetchImpl) {
   const baseShowIndex = buildShowIndex(baseShows);
   const theatreMap = buildTheatreMap(baseShows, baseline?.theatres || []);
   const snapshotsById = new Map();
+  const successfulEventCodes = [];
+  const failedEventCodes = [];
 
   for (const show of baseShows) {
     snapshotsById.set(show.id, show);
@@ -432,12 +458,33 @@ async function refreshLiveSnapshot(baseline, fetchImpl) {
       for (const snapshot of buildApiSnapshotsFromPayload(payload, theatreMap, baseShowIndex)) {
         snapshotsById.set(snapshot.id, snapshot);
       }
+
+      successfulEventCodes.push(eventCode);
     } catch (error) {
+      failedEventCodes.push(eventCode);
       notes.push(`Live refresh failed for ${eventCode}: ${error.message}`);
     }
   }
 
-  return buildOutputFromBaseline(baseline, Array.from(snapshotsById.values()), notes);
+  const output = buildOutputFromBaseline(baseline, Array.from(snapshotsById.values()), notes);
+  const liveShowCount = output.shows.filter(
+    (show) => show.source?.method === "live-proxy-showtimes"
+  ).length;
+
+  return {
+    ...output,
+    meta: {
+      ...(output.meta || {}),
+      liveRefresh: {
+        attemptedEvents: uniqueEventCodes.length,
+        successfulEvents: successfulEventCodes.length,
+        failedEvents: failedEventCodes.length,
+        failedEventCodes,
+        liveShowCount,
+        fallbackShowCount: output.shows.length - liveShowCount
+      }
+    }
+  };
 }
 
 export async function buildLiveSnapshot({

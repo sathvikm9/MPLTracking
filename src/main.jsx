@@ -759,6 +759,12 @@ function App() {
   const hasDiscoveryOnlyShows =
     filteredShows.length > 0 &&
     filteredShows.every((show) => show.source?.method === "bookmyshow-showtime-discovery");
+  const liveRefresh = data.meta?.liveRefresh;
+  const liveRetryFailed =
+    isLiveProxy && hasDiscoveryOnlyShows && Number(liveRefresh?.failedEvents || 0) > 0;
+  const discoveryOnlyMessage = liveRetryFailed
+    ? "Live BookMyShow count retry failed for this selection, so showtimes are being shown without seat counts. Click Refresh live data to try the live mirrors again."
+    : "Showtimes are available for this date, but BookMyShow has not exposed live seat counts through the category payload yet.";
   const emptyMessage =
     selectedTheatre === "ALL"
       ? `No shows found for ${formatSelectedDateLabel(selectedDate)}.`
@@ -809,10 +815,7 @@ function App() {
           </div>
 
           {hasDiscoveryOnlyShows ? (
-            <div className="live-status-note">
-              Showtimes are available for this date, but BookMyShow has not exposed live seat counts
-              through the category payload yet.
-            </div>
+            <div className="live-status-note">{discoveryOnlyMessage}</div>
           ) : null}
 
           <div className="hero__actions">
