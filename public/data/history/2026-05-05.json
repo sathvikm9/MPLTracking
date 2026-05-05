@@ -1,0 +1,1254 @@
+{
+  "version": 1,
+  "generatedAt": "2026-05-05T04:47:11.496Z",
+  "generatedAtLabel": "05-May-2026, 10:17:11 am",
+  "targetDate": "2026-05-05",
+  "targetDateCode": "20260505",
+  "timezone": "Asia/Kolkata",
+  "city": {
+    "name": "Madanapalle",
+    "regionCode": "MDNP",
+    "timezone": "Asia/Kolkata",
+    "slug": "madanapalle",
+    "country": "India",
+    "state": "Andhra Pradesh"
+  },
+  "summary": {
+    "totalShows": 16,
+    "totalCapacity": 8340,
+    "totalAvailable": 8334,
+    "totalSold": 6,
+    "totalGross": 630,
+    "occupancyPercent": 0.07
+  },
+  "movies": [
+    {
+      "eventCode": "ET00380715",
+      "title": "Dacoit",
+      "displayTitle": "Dacoit - Telugu",
+      "language": "Telugu",
+      "format": "2D",
+      "censor": "UA13",
+      "genres": [
+        "Action",
+        "Drama",
+        "Romantic",
+        "Thriller"
+      ],
+      "totalShows": 3,
+      "totalCapacity": 1911,
+      "totalAvailable": 1907,
+      "totalSold": 4,
+      "totalGross": 420,
+      "venueCodes": {},
+      "venueCount": 1,
+      "occupancyPercent": 0.21
+    },
+    {
+      "eventCode": "ET00495359",
+      "title": "Vaazha 2: Biopic of a Billion Bros",
+      "displayTitle": "Vaazha 2: Biopic of a Billion Bros (Telugu) - Telugu",
+      "language": "Telugu",
+      "format": "2D",
+      "censor": "UA13",
+      "genres": [
+        "Action",
+        "Comedy",
+        "Drama",
+        "Family"
+      ],
+      "totalShows": 4,
+      "totalCapacity": 2628,
+      "totalAvailable": 2626,
+      "totalSold": 2,
+      "totalGross": 210,
+      "venueCodes": {},
+      "venueCount": 1,
+      "occupancyPercent": 0.08
+    },
+    {
+      "eventCode": "ET00493107",
+      "title": "GaayaPadda Simham",
+      "displayTitle": "GaayaPadda Simham - Telugu",
+      "language": "Telugu",
+      "format": "2D",
+      "censor": "UA16",
+      "genres": [
+        "Action",
+        "Drama"
+      ],
+      "totalShows": 4,
+      "totalCapacity": 2080,
+      "totalAvailable": 2080,
+      "totalSold": 0,
+      "totalGross": 0,
+      "venueCodes": {},
+      "venueCount": 1,
+      "occupancyPercent": 0
+    },
+    {
+      "eventCode": "ET00030041",
+      "title": "Ganga",
+      "displayTitle": "Ganga (2015) - Telugu",
+      "language": "Telugu",
+      "format": "2D",
+      "censor": "UA",
+      "genres": [
+        "Comedy",
+        "Horror",
+        "Suspense"
+      ],
+      "totalShows": 1,
+      "totalCapacity": 637,
+      "totalAvailable": 637,
+      "totalSold": 0,
+      "totalGross": 0,
+      "venueCodes": {},
+      "venueCount": 1,
+      "occupancyPercent": 0
+    },
+    {
+      "eventCode": "ET00496966",
+      "title": "Kara",
+      "displayTitle": "Kara (Telugu) - Telugu",
+      "language": "Telugu",
+      "format": "2D",
+      "censor": "UA16",
+      "genres": [
+        "Action",
+        "Thriller"
+      ],
+      "totalShows": 4,
+      "totalCapacity": 1084,
+      "totalAvailable": 1084,
+      "totalSold": 0,
+      "totalGross": 0,
+      "venueCodes": {},
+      "venueCount": 1,
+      "occupancyPercent": 0
+    }
+  ],
+  "theatres": [
+    {
+      "venueCode": "RTDM",
+      "name": "Ravi A/C 4K Laser Dolby Surround 7.1: Madanapalle",
+      "shortName": "Ravi",
+      "totalShows": 4,
+      "totalCapacity": 2548,
+      "totalAvailable": 2544,
+      "totalSold": 4,
+      "totalGross": 420,
+      "occupancyPercent": 0.16
+    },
+    {
+      "venueCode": "SKMD",
+      "name": "Sri Krishna A/C 4K Dolby Atmos: Madanapalle",
+      "shortName": "Sri Krishna",
+      "totalShows": 4,
+      "totalCapacity": 2628,
+      "totalAvailable": 2626,
+      "totalSold": 2,
+      "totalGross": 210,
+      "occupancyPercent": 0.08
+    },
+    {
+      "venueCode": "ASRM",
+      "name": "ASR A/C 4K Laser Dolby Surround 7.1: Madanapalle",
+      "shortName": "ASR",
+      "totalShows": 4,
+      "totalCapacity": 2080,
+      "totalAvailable": 2080,
+      "totalSold": 0,
+      "totalGross": 0,
+      "occupancyPercent": 0
+    },
+    {
+      "venueCode": "MSDR",
+      "name": "Siddartha Cinemas:Screen 2 Dolby Laser,Madanapalle",
+      "shortName": "Siddartha",
+      "totalShows": 4,
+      "totalCapacity": 1084,
+      "totalAvailable": 1084,
+      "totalSold": 0,
+      "totalGross": 0,
+      "occupancyPercent": 0
+    }
+  ],
+  "shows": [
+    {
+      "id": "ASRM-8376",
+      "eventCode": "ET00493107",
+      "sessionId": "8376",
+      "venueCode": "ASRM",
+      "venueName": "ASR A/C 4K Laser Dolby Surround 7.1: Madanapalle",
+      "theatreShortName": "ASR",
+      "citySlug": "madanapalle",
+      "showDate": "2026-05-05",
+      "showDateCode": "20260505",
+      "showDateTime": "2026-05-05T05:30:00.000Z",
+      "showDateTimeCode": "202605051100",
+      "showTimeLabel": "11:00 AM",
+      "cutoffAt": "2026-05-05T05:45:00.000Z",
+      "cutoffCode": "202605051115",
+      "format": "2D",
+      "language": "Telugu",
+      "title": "GaayaPadda Simham - Telugu",
+      "releaseLabel": "GaayaPadda Simham",
+      "censor": "UA16",
+      "genres": [
+        "Action",
+        "Drama"
+      ],
+      "trailerUrl": "https://www.youtube.com/watch?v=j5W446fgx7A",
+      "screenName": "ASR",
+      "bookingUrl": "https://in.bookmyshow.com/cinemas/madanapalle/asr-a-c-4k-laser-dolby-surround-71-madanapalle/buytickets/ASRM/20260505",
+      "seatLayoutUrl": "https://in.bookmyshow.com/movies/madanapalle/seat-layout/ET00493107/ASRM/8376/20260505",
+      "categories": [
+        {
+          "name": "RESERVED",
+          "label": "RESERVED",
+          "price": 105,
+          "totalSeats": 386,
+          "availableSeats": 386,
+          "soldSeats": 0,
+          "unknownSeats": 0,
+          "rows": []
+        },
+        {
+          "name": "SECOND CLASS",
+          "label": "SECOND CLASS",
+          "price": 84,
+          "totalSeats": 134,
+          "availableSeats": 134,
+          "soldSeats": 0,
+          "unknownSeats": 0,
+          "rows": []
+        }
+      ],
+      "totalSeats": 520,
+      "availableSeats": 520,
+      "soldSeats": 0,
+      "unknownSeats": 0,
+      "gross": 0,
+      "occupancyPercent": 0,
+      "source": {
+        "method": "bms-india-showtimes",
+        "capturedAt": "2026-05-05T04:47:09.555Z"
+      }
+    },
+    {
+      "id": "RTDM-16180",
+      "eventCode": "ET00030041",
+      "sessionId": "16180",
+      "venueCode": "RTDM",
+      "venueName": "Ravi A/C 4K Laser Dolby Surround 7.1: Madanapalle",
+      "theatreShortName": "Ravi",
+      "citySlug": "madanapalle",
+      "showDate": "2026-05-05",
+      "showDateCode": "20260505",
+      "showDateTime": "2026-05-05T05:30:00.000Z",
+      "showDateTimeCode": "202605051100",
+      "showTimeLabel": "11:00 AM",
+      "cutoffAt": "2026-05-05T06:00:00.000Z",
+      "cutoffCode": "202605051130",
+      "format": "2D",
+      "language": "Telugu",
+      "title": "Ganga (2015) - Telugu",
+      "releaseLabel": "Ganga",
+      "censor": "UA",
+      "genres": [
+        "Comedy",
+        "Horror",
+        "Suspense"
+      ],
+      "trailerUrl": "https://www.youtube.com/watch?v=HVPVAC158z0",
+      "screenName": "Ravi",
+      "bookingUrl": "https://in.bookmyshow.com/cinemas/madanapalle/ravi-a-c-4k-laser-dolby-surround-71-madanapalle/buytickets/RTDM/20260505",
+      "seatLayoutUrl": "https://in.bookmyshow.com/movies/madanapalle/seat-layout/ET00030041/RTDM/16180/20260505",
+      "categories": [
+        {
+          "name": "BALCONY",
+          "label": "BALCONY",
+          "price": 105,
+          "totalSeats": 132,
+          "availableSeats": 132,
+          "soldSeats": 0,
+          "unknownSeats": 0,
+          "rows": []
+        },
+        {
+          "name": "RESERVED",
+          "label": "RESERVED",
+          "price": 105,
+          "totalSeats": 213,
+          "availableSeats": 213,
+          "soldSeats": 0,
+          "unknownSeats": 0,
+          "rows": []
+        },
+        {
+          "name": "FIRST CLASS",
+          "label": "FIRST CLASS",
+          "price": 105,
+          "totalSeats": 112,
+          "availableSeats": 112,
+          "soldSeats": 0,
+          "unknownSeats": 0,
+          "rows": []
+        },
+        {
+          "name": "SECOND CLASS",
+          "label": "SECOND CLASS",
+          "price": 84,
+          "totalSeats": 180,
+          "availableSeats": 180,
+          "soldSeats": 0,
+          "unknownSeats": 0,
+          "rows": []
+        }
+      ],
+      "totalSeats": 637,
+      "availableSeats": 637,
+      "soldSeats": 0,
+      "unknownSeats": 0,
+      "gross": 0,
+      "occupancyPercent": 0,
+      "source": {
+        "method": "bms-india-showtimes",
+        "capturedAt": "2026-05-05T04:47:10.031Z"
+      }
+    },
+    {
+      "id": "SKMD-5741",
+      "eventCode": "ET00495359",
+      "sessionId": "5741",
+      "venueCode": "SKMD",
+      "venueName": "Sri Krishna A/C 4K Dolby Atmos: Madanapalle",
+      "theatreShortName": "Sri Krishna",
+      "citySlug": "madanapalle",
+      "showDate": "2026-05-05",
+      "showDateCode": "20260505",
+      "showDateTime": "2026-05-05T05:30:00.000Z",
+      "showDateTimeCode": "202605051100",
+      "showTimeLabel": "11:00 AM",
+      "cutoffAt": "2026-05-05T05:45:00.000Z",
+      "cutoffCode": "202605051115",
+      "format": "2D",
+      "language": "Telugu",
+      "title": "Vaazha 2: Biopic of a Billion Bros (Telugu) - Telugu",
+      "releaseLabel": "Vaazha 2: Biopic of a Billion Bros",
+      "censor": "UA13",
+      "genres": [
+        "Action",
+        "Comedy",
+        "Drama",
+        "Family"
+      ],
+      "trailerUrl": "https://www.youtube.com/watch?v=CoPGwmCuaiI",
+      "screenName": "Sri Krishna",
+      "bookingUrl": "https://in.bookmyshow.com/cinemas/madanapalle/sri-krishna-a-c-4k-dolby-atmos-madanapalle/buytickets/SKMD/20260505",
+      "seatLayoutUrl": "https://in.bookmyshow.com/movies/madanapalle/seat-layout/ET00495359/SKMD/5741/20260505",
+      "categories": [
+        {
+          "name": "RESERVED CLASS",
+          "label": "RESERVED CLASS",
+          "price": 105,
+          "totalSeats": 493,
+          "availableSeats": 491,
+          "soldSeats": 2,
+          "unknownSeats": 0,
+          "rows": []
+        },
+        {
+          "name": "SECOND CLASS",
+          "label": "SECOND CLASS",
+          "price": 84,
+          "totalSeats": 164,
+          "availableSeats": 164,
+          "soldSeats": 0,
+          "unknownSeats": 0,
+          "rows": []
+        }
+      ],
+      "totalSeats": 657,
+      "availableSeats": 655,
+      "soldSeats": 2,
+      "unknownSeats": 0,
+      "gross": 210,
+      "occupancyPercent": 0.3,
+      "source": {
+        "method": "bms-india-showtimes",
+        "capturedAt": "2026-05-05T04:47:11.495Z"
+      }
+    },
+    {
+      "id": "MSDR-11945",
+      "eventCode": "ET00496966",
+      "sessionId": "11945",
+      "venueCode": "MSDR",
+      "venueName": "Siddartha Cinemas:Screen 2 Dolby Laser,Madanapalle",
+      "theatreShortName": "Siddartha",
+      "citySlug": "madanapalle",
+      "showDate": "2026-05-05",
+      "showDateCode": "20260505",
+      "showDateTime": "2026-05-05T05:45:00.000Z",
+      "showDateTimeCode": "202605051115",
+      "showTimeLabel": "11:15 AM",
+      "cutoffAt": "2026-05-05T06:15:00.000Z",
+      "cutoffCode": "202605051145",
+      "format": "2D",
+      "language": "Telugu",
+      "title": "Kara (Telugu) - Telugu",
+      "releaseLabel": "Kara",
+      "censor": "UA16",
+      "genres": [
+        "Action",
+        "Thriller"
+      ],
+      "trailerUrl": "https://www.youtube.com/watch?v=9p_BGN1swDQ",
+      "screenName": "Siddartha",
+      "bookingUrl": "https://in.bookmyshow.com/cinemas/madanapalle/siddartha-cinemasscreen-2-dolby-lasermadanapalle/buytickets/MSDR/20260505",
+      "seatLayoutUrl": "https://in.bookmyshow.com/movies/madanapalle/seat-layout/ET00496966/MSDR/11945/20260505",
+      "categories": [
+        {
+          "name": "Gold Class",
+          "label": "Gold Class",
+          "price": 105,
+          "totalSeats": 238,
+          "availableSeats": 238,
+          "soldSeats": 0,
+          "unknownSeats": 0,
+          "rows": []
+        },
+        {
+          "name": "Silver Class",
+          "label": "Silver Class",
+          "price": 84,
+          "totalSeats": 33,
+          "availableSeats": 33,
+          "soldSeats": 0,
+          "unknownSeats": 0,
+          "rows": []
+        }
+      ],
+      "totalSeats": 271,
+      "availableSeats": 271,
+      "soldSeats": 0,
+      "unknownSeats": 0,
+      "gross": 0,
+      "occupancyPercent": 0,
+      "source": {
+        "method": "bms-india-showtimes",
+        "capturedAt": "2026-05-05T04:47:11.007Z"
+      }
+    },
+    {
+      "id": "SKMD-5742",
+      "eventCode": "ET00495359",
+      "sessionId": "5742",
+      "venueCode": "SKMD",
+      "venueName": "Sri Krishna A/C 4K Dolby Atmos: Madanapalle",
+      "theatreShortName": "Sri Krishna",
+      "citySlug": "madanapalle",
+      "showDate": "2026-05-05",
+      "showDateCode": "20260505",
+      "showDateTime": "2026-05-05T08:30:00.000Z",
+      "showDateTimeCode": "202605051400",
+      "showTimeLabel": "02:00 PM",
+      "cutoffAt": "2026-05-05T08:45:00.000Z",
+      "cutoffCode": "202605051415",
+      "format": "2D",
+      "language": "Telugu",
+      "title": "Vaazha 2: Biopic of a Billion Bros (Telugu) - Telugu",
+      "releaseLabel": "Vaazha 2: Biopic of a Billion Bros",
+      "censor": "UA13",
+      "genres": [
+        "Action",
+        "Comedy",
+        "Drama",
+        "Family"
+      ],
+      "trailerUrl": "https://www.youtube.com/watch?v=CoPGwmCuaiI",
+      "screenName": "Sri Krishna",
+      "bookingUrl": "https://in.bookmyshow.com/cinemas/madanapalle/sri-krishna-a-c-4k-dolby-atmos-madanapalle/buytickets/SKMD/20260505",
+      "seatLayoutUrl": "https://in.bookmyshow.com/movies/madanapalle/seat-layout/ET00495359/SKMD/5742/20260505",
+      "categories": [
+        {
+          "name": "RESERVED CLASS",
+          "label": "RESERVED CLASS",
+          "price": 105,
+          "totalSeats": 493,
+          "availableSeats": 493,
+          "soldSeats": 0,
+          "unknownSeats": 0,
+          "rows": []
+        },
+        {
+          "name": "SECOND CLASS",
+          "label": "SECOND CLASS",
+          "price": 84,
+          "totalSeats": 164,
+          "availableSeats": 164,
+          "soldSeats": 0,
+          "unknownSeats": 0,
+          "rows": []
+        }
+      ],
+      "totalSeats": 657,
+      "availableSeats": 657,
+      "soldSeats": 0,
+      "unknownSeats": 0,
+      "gross": 0,
+      "occupancyPercent": 0,
+      "source": {
+        "method": "bms-india-showtimes",
+        "capturedAt": "2026-05-05T04:47:11.495Z"
+      }
+    },
+    {
+      "id": "ASRM-8377",
+      "eventCode": "ET00493107",
+      "sessionId": "8377",
+      "venueCode": "ASRM",
+      "venueName": "ASR A/C 4K Laser Dolby Surround 7.1: Madanapalle",
+      "theatreShortName": "ASR",
+      "citySlug": "madanapalle",
+      "showDate": "2026-05-05",
+      "showDateCode": "20260505",
+      "showDateTime": "2026-05-05T08:45:00.000Z",
+      "showDateTimeCode": "202605051415",
+      "showTimeLabel": "02:15 PM",
+      "cutoffAt": "2026-05-05T09:00:00.000Z",
+      "cutoffCode": "202605051430",
+      "format": "2D",
+      "language": "Telugu",
+      "title": "GaayaPadda Simham - Telugu",
+      "releaseLabel": "GaayaPadda Simham",
+      "censor": "UA16",
+      "genres": [
+        "Action",
+        "Drama"
+      ],
+      "trailerUrl": "https://www.youtube.com/watch?v=j5W446fgx7A",
+      "screenName": "ASR",
+      "bookingUrl": "https://in.bookmyshow.com/cinemas/madanapalle/asr-a-c-4k-laser-dolby-surround-71-madanapalle/buytickets/ASRM/20260505",
+      "seatLayoutUrl": "https://in.bookmyshow.com/movies/madanapalle/seat-layout/ET00493107/ASRM/8377/20260505",
+      "categories": [
+        {
+          "name": "RESERVED",
+          "label": "RESERVED",
+          "price": 105,
+          "totalSeats": 386,
+          "availableSeats": 386,
+          "soldSeats": 0,
+          "unknownSeats": 0,
+          "rows": []
+        },
+        {
+          "name": "SECOND CLASS",
+          "label": "SECOND CLASS",
+          "price": 84,
+          "totalSeats": 134,
+          "availableSeats": 134,
+          "soldSeats": 0,
+          "unknownSeats": 0,
+          "rows": []
+        }
+      ],
+      "totalSeats": 520,
+      "availableSeats": 520,
+      "soldSeats": 0,
+      "unknownSeats": 0,
+      "gross": 0,
+      "occupancyPercent": 0,
+      "source": {
+        "method": "bms-india-showtimes",
+        "capturedAt": "2026-05-05T04:47:09.556Z"
+      }
+    },
+    {
+      "id": "RTDM-16166",
+      "eventCode": "ET00380715",
+      "sessionId": "16166",
+      "venueCode": "RTDM",
+      "venueName": "Ravi A/C 4K Laser Dolby Surround 7.1: Madanapalle",
+      "theatreShortName": "Ravi",
+      "citySlug": "madanapalle",
+      "showDate": "2026-05-05",
+      "showDateCode": "20260505",
+      "showDateTime": "2026-05-05T08:45:00.000Z",
+      "showDateTimeCode": "202605051415",
+      "showTimeLabel": "02:15 PM",
+      "cutoffAt": "2026-05-05T09:15:00.000Z",
+      "cutoffCode": "202605051445",
+      "format": "2D",
+      "language": "Telugu",
+      "title": "Dacoit - Telugu",
+      "releaseLabel": "Dacoit",
+      "censor": "UA13",
+      "genres": [
+        "Action",
+        "Drama",
+        "Romantic",
+        "Thriller"
+      ],
+      "trailerUrl": "https://www.youtube.com/watch?v=Hxe5D0VMmas",
+      "screenName": "Ravi",
+      "bookingUrl": "https://in.bookmyshow.com/cinemas/madanapalle/ravi-a-c-4k-laser-dolby-surround-71-madanapalle/buytickets/RTDM/20260505",
+      "seatLayoutUrl": "https://in.bookmyshow.com/movies/madanapalle/seat-layout/ET00380715/RTDM/16166/20260505",
+      "categories": [
+        {
+          "name": "BALCONY",
+          "label": "BALCONY",
+          "price": 105,
+          "totalSeats": 132,
+          "availableSeats": 131,
+          "soldSeats": 1,
+          "unknownSeats": 0,
+          "rows": []
+        },
+        {
+          "name": "RESERVED",
+          "label": "RESERVED",
+          "price": 105,
+          "totalSeats": 213,
+          "availableSeats": 213,
+          "soldSeats": 0,
+          "unknownSeats": 0,
+          "rows": []
+        },
+        {
+          "name": "FIRST CLASS",
+          "label": "FIRST CLASS",
+          "price": 105,
+          "totalSeats": 112,
+          "availableSeats": 112,
+          "soldSeats": 0,
+          "unknownSeats": 0,
+          "rows": []
+        },
+        {
+          "name": "SECOND CLASS",
+          "label": "SECOND CLASS",
+          "price": 84,
+          "totalSeats": 180,
+          "availableSeats": 180,
+          "soldSeats": 0,
+          "unknownSeats": 0,
+          "rows": []
+        }
+      ],
+      "totalSeats": 637,
+      "availableSeats": 636,
+      "soldSeats": 1,
+      "unknownSeats": 0,
+      "gross": 105,
+      "occupancyPercent": 0.16,
+      "source": {
+        "method": "bms-india-showtimes",
+        "capturedAt": "2026-05-05T04:47:10.529Z"
+      }
+    },
+    {
+      "id": "MSDR-11939",
+      "eventCode": "ET00496966",
+      "sessionId": "11939",
+      "venueCode": "MSDR",
+      "venueName": "Siddartha Cinemas:Screen 2 Dolby Laser,Madanapalle",
+      "theatreShortName": "Siddartha",
+      "citySlug": "madanapalle",
+      "showDate": "2026-05-05",
+      "showDateCode": "20260505",
+      "showDateTime": "2026-05-05T08:45:00.000Z",
+      "showDateTimeCode": "202605051415",
+      "showTimeLabel": "02:15 PM",
+      "cutoffAt": "2026-05-05T09:15:00.000Z",
+      "cutoffCode": "202605051445",
+      "format": "2D",
+      "language": "Telugu",
+      "title": "Kara (Telugu) - Telugu",
+      "releaseLabel": "Kara",
+      "censor": "UA16",
+      "genres": [
+        "Action",
+        "Thriller"
+      ],
+      "trailerUrl": "https://www.youtube.com/watch?v=9p_BGN1swDQ",
+      "screenName": "Siddartha",
+      "bookingUrl": "https://in.bookmyshow.com/cinemas/madanapalle/siddartha-cinemasscreen-2-dolby-lasermadanapalle/buytickets/MSDR/20260505",
+      "seatLayoutUrl": "https://in.bookmyshow.com/movies/madanapalle/seat-layout/ET00496966/MSDR/11939/20260505",
+      "categories": [
+        {
+          "name": "Gold Class",
+          "label": "Gold Class",
+          "price": 105,
+          "totalSeats": 238,
+          "availableSeats": 238,
+          "soldSeats": 0,
+          "unknownSeats": 0,
+          "rows": []
+        },
+        {
+          "name": "Silver Class",
+          "label": "Silver Class",
+          "price": 84,
+          "totalSeats": 33,
+          "availableSeats": 33,
+          "soldSeats": 0,
+          "unknownSeats": 0,
+          "rows": []
+        }
+      ],
+      "totalSeats": 271,
+      "availableSeats": 271,
+      "soldSeats": 0,
+      "unknownSeats": 0,
+      "gross": 0,
+      "occupancyPercent": 0,
+      "source": {
+        "method": "bms-india-showtimes",
+        "capturedAt": "2026-05-05T04:47:11.007Z"
+      }
+    },
+    {
+      "id": "ASRM-8378",
+      "eventCode": "ET00493107",
+      "sessionId": "8378",
+      "venueCode": "ASRM",
+      "venueName": "ASR A/C 4K Laser Dolby Surround 7.1: Madanapalle",
+      "theatreShortName": "ASR",
+      "citySlug": "madanapalle",
+      "showDate": "2026-05-05",
+      "showDateCode": "20260505",
+      "showDateTime": "2026-05-05T12:30:00.000Z",
+      "showDateTimeCode": "202605051800",
+      "showTimeLabel": "06:00 PM",
+      "cutoffAt": "2026-05-05T12:45:00.000Z",
+      "cutoffCode": "202605051815",
+      "format": "2D",
+      "language": "Telugu",
+      "title": "GaayaPadda Simham - Telugu",
+      "releaseLabel": "GaayaPadda Simham",
+      "censor": "UA16",
+      "genres": [
+        "Action",
+        "Drama"
+      ],
+      "trailerUrl": "https://www.youtube.com/watch?v=j5W446fgx7A",
+      "screenName": "ASR",
+      "bookingUrl": "https://in.bookmyshow.com/cinemas/madanapalle/asr-a-c-4k-laser-dolby-surround-71-madanapalle/buytickets/ASRM/20260505",
+      "seatLayoutUrl": "https://in.bookmyshow.com/movies/madanapalle/seat-layout/ET00493107/ASRM/8378/20260505",
+      "categories": [
+        {
+          "name": "RESERVED",
+          "label": "RESERVED",
+          "price": 105,
+          "totalSeats": 386,
+          "availableSeats": 386,
+          "soldSeats": 0,
+          "unknownSeats": 0,
+          "rows": []
+        },
+        {
+          "name": "SECOND CLASS",
+          "label": "SECOND CLASS",
+          "price": 84,
+          "totalSeats": 134,
+          "availableSeats": 134,
+          "soldSeats": 0,
+          "unknownSeats": 0,
+          "rows": []
+        }
+      ],
+      "totalSeats": 520,
+      "availableSeats": 520,
+      "soldSeats": 0,
+      "unknownSeats": 0,
+      "gross": 0,
+      "occupancyPercent": 0,
+      "source": {
+        "method": "bms-india-showtimes",
+        "capturedAt": "2026-05-05T04:47:09.556Z"
+      }
+    },
+    {
+      "id": "SKMD-5743",
+      "eventCode": "ET00495359",
+      "sessionId": "5743",
+      "venueCode": "SKMD",
+      "venueName": "Sri Krishna A/C 4K Dolby Atmos: Madanapalle",
+      "theatreShortName": "Sri Krishna",
+      "citySlug": "madanapalle",
+      "showDate": "2026-05-05",
+      "showDateCode": "20260505",
+      "showDateTime": "2026-05-05T12:30:00.000Z",
+      "showDateTimeCode": "202605051800",
+      "showTimeLabel": "06:00 PM",
+      "cutoffAt": "2026-05-05T12:45:00.000Z",
+      "cutoffCode": "202605051815",
+      "format": "2D",
+      "language": "Telugu",
+      "title": "Vaazha 2: Biopic of a Billion Bros (Telugu) - Telugu",
+      "releaseLabel": "Vaazha 2: Biopic of a Billion Bros",
+      "censor": "UA13",
+      "genres": [
+        "Action",
+        "Comedy",
+        "Drama",
+        "Family"
+      ],
+      "trailerUrl": "https://www.youtube.com/watch?v=CoPGwmCuaiI",
+      "screenName": "Sri Krishna",
+      "bookingUrl": "https://in.bookmyshow.com/cinemas/madanapalle/sri-krishna-a-c-4k-dolby-atmos-madanapalle/buytickets/SKMD/20260505",
+      "seatLayoutUrl": "https://in.bookmyshow.com/movies/madanapalle/seat-layout/ET00495359/SKMD/5743/20260505",
+      "categories": [
+        {
+          "name": "RESERVED CLASS",
+          "label": "RESERVED CLASS",
+          "price": 105,
+          "totalSeats": 493,
+          "availableSeats": 493,
+          "soldSeats": 0,
+          "unknownSeats": 0,
+          "rows": []
+        },
+        {
+          "name": "SECOND CLASS",
+          "label": "SECOND CLASS",
+          "price": 84,
+          "totalSeats": 164,
+          "availableSeats": 164,
+          "soldSeats": 0,
+          "unknownSeats": 0,
+          "rows": []
+        }
+      ],
+      "totalSeats": 657,
+      "availableSeats": 657,
+      "soldSeats": 0,
+      "unknownSeats": 0,
+      "gross": 0,
+      "occupancyPercent": 0,
+      "source": {
+        "method": "bms-india-showtimes",
+        "capturedAt": "2026-05-05T04:47:11.496Z"
+      }
+    },
+    {
+      "id": "RTDM-16167",
+      "eventCode": "ET00380715",
+      "sessionId": "16167",
+      "venueCode": "RTDM",
+      "venueName": "Ravi A/C 4K Laser Dolby Surround 7.1: Madanapalle",
+      "theatreShortName": "Ravi",
+      "citySlug": "madanapalle",
+      "showDate": "2026-05-05",
+      "showDateCode": "20260505",
+      "showDateTime": "2026-05-05T12:40:00.000Z",
+      "showDateTimeCode": "202605051810",
+      "showTimeLabel": "06:10 PM",
+      "cutoffAt": "2026-05-05T13:10:00.000Z",
+      "cutoffCode": "202605051840",
+      "format": "2D",
+      "language": "Telugu",
+      "title": "Dacoit - Telugu",
+      "releaseLabel": "Dacoit",
+      "censor": "UA13",
+      "genres": [
+        "Action",
+        "Drama",
+        "Romantic",
+        "Thriller"
+      ],
+      "trailerUrl": "https://www.youtube.com/watch?v=Hxe5D0VMmas",
+      "screenName": "Ravi",
+      "bookingUrl": "https://in.bookmyshow.com/cinemas/madanapalle/ravi-a-c-4k-laser-dolby-surround-71-madanapalle/buytickets/RTDM/20260505",
+      "seatLayoutUrl": "https://in.bookmyshow.com/movies/madanapalle/seat-layout/ET00380715/RTDM/16167/20260505",
+      "categories": [
+        {
+          "name": "BALCONY",
+          "label": "BALCONY",
+          "price": 105,
+          "totalSeats": 132,
+          "availableSeats": 132,
+          "soldSeats": 0,
+          "unknownSeats": 0,
+          "rows": []
+        },
+        {
+          "name": "RESERVED",
+          "label": "RESERVED",
+          "price": 105,
+          "totalSeats": 213,
+          "availableSeats": 213,
+          "soldSeats": 0,
+          "unknownSeats": 0,
+          "rows": []
+        },
+        {
+          "name": "FIRST CLASS",
+          "label": "FIRST CLASS",
+          "price": 105,
+          "totalSeats": 112,
+          "availableSeats": 112,
+          "soldSeats": 0,
+          "unknownSeats": 0,
+          "rows": []
+        },
+        {
+          "name": "SECOND CLASS",
+          "label": "SECOND CLASS",
+          "price": 84,
+          "totalSeats": 180,
+          "availableSeats": 180,
+          "soldSeats": 0,
+          "unknownSeats": 0,
+          "rows": []
+        }
+      ],
+      "totalSeats": 637,
+      "availableSeats": 637,
+      "soldSeats": 0,
+      "unknownSeats": 0,
+      "gross": 0,
+      "occupancyPercent": 0,
+      "source": {
+        "method": "bms-india-showtimes",
+        "capturedAt": "2026-05-05T04:47:10.529Z"
+      }
+    },
+    {
+      "id": "MSDR-11925",
+      "eventCode": "ET00496966",
+      "sessionId": "11925",
+      "venueCode": "MSDR",
+      "venueName": "Siddartha Cinemas:Screen 2 Dolby Laser,Madanapalle",
+      "theatreShortName": "Siddartha",
+      "citySlug": "madanapalle",
+      "showDate": "2026-05-05",
+      "showDateCode": "20260505",
+      "showDateTime": "2026-05-05T12:45:00.000Z",
+      "showDateTimeCode": "202605051815",
+      "showTimeLabel": "06:15 PM",
+      "cutoffAt": "2026-05-05T13:15:00.000Z",
+      "cutoffCode": "202605051845",
+      "format": "2D",
+      "language": "Telugu",
+      "title": "Kara (Telugu) - Telugu",
+      "releaseLabel": "Kara",
+      "censor": "UA16",
+      "genres": [
+        "Action",
+        "Thriller"
+      ],
+      "trailerUrl": "https://www.youtube.com/watch?v=9p_BGN1swDQ",
+      "screenName": "Siddartha",
+      "bookingUrl": "https://in.bookmyshow.com/cinemas/madanapalle/siddartha-cinemasscreen-2-dolby-lasermadanapalle/buytickets/MSDR/20260505",
+      "seatLayoutUrl": "https://in.bookmyshow.com/movies/madanapalle/seat-layout/ET00496966/MSDR/11925/20260505",
+      "categories": [
+        {
+          "name": "Gold Class",
+          "label": "Gold Class",
+          "price": 105,
+          "totalSeats": 238,
+          "availableSeats": 238,
+          "soldSeats": 0,
+          "unknownSeats": 0,
+          "rows": []
+        },
+        {
+          "name": "Silver Class",
+          "label": "Silver Class",
+          "price": 84,
+          "totalSeats": 33,
+          "availableSeats": 33,
+          "soldSeats": 0,
+          "unknownSeats": 0,
+          "rows": []
+        }
+      ],
+      "totalSeats": 271,
+      "availableSeats": 271,
+      "soldSeats": 0,
+      "unknownSeats": 0,
+      "gross": 0,
+      "occupancyPercent": 0,
+      "source": {
+        "method": "bms-india-showtimes",
+        "capturedAt": "2026-05-05T04:47:11.007Z"
+      }
+    },
+    {
+      "id": "SKMD-5744",
+      "eventCode": "ET00495359",
+      "sessionId": "5744",
+      "venueCode": "SKMD",
+      "venueName": "Sri Krishna A/C 4K Dolby Atmos: Madanapalle",
+      "theatreShortName": "Sri Krishna",
+      "citySlug": "madanapalle",
+      "showDate": "2026-05-05",
+      "showDateCode": "20260505",
+      "showDateTime": "2026-05-05T15:30:00.000Z",
+      "showDateTimeCode": "202605052100",
+      "showTimeLabel": "09:00 PM",
+      "cutoffAt": "2026-05-05T15:45:00.000Z",
+      "cutoffCode": "202605052115",
+      "format": "2D",
+      "language": "Telugu",
+      "title": "Vaazha 2: Biopic of a Billion Bros (Telugu) - Telugu",
+      "releaseLabel": "Vaazha 2: Biopic of a Billion Bros",
+      "censor": "UA13",
+      "genres": [
+        "Action",
+        "Comedy",
+        "Drama",
+        "Family"
+      ],
+      "trailerUrl": "https://www.youtube.com/watch?v=CoPGwmCuaiI",
+      "screenName": "Sri Krishna",
+      "bookingUrl": "https://in.bookmyshow.com/cinemas/madanapalle/sri-krishna-a-c-4k-dolby-atmos-madanapalle/buytickets/SKMD/20260505",
+      "seatLayoutUrl": "https://in.bookmyshow.com/movies/madanapalle/seat-layout/ET00495359/SKMD/5744/20260505",
+      "categories": [
+        {
+          "name": "RESERVED CLASS",
+          "label": "RESERVED CLASS",
+          "price": 105,
+          "totalSeats": 493,
+          "availableSeats": 493,
+          "soldSeats": 0,
+          "unknownSeats": 0,
+          "rows": []
+        },
+        {
+          "name": "SECOND CLASS",
+          "label": "SECOND CLASS",
+          "price": 84,
+          "totalSeats": 164,
+          "availableSeats": 164,
+          "soldSeats": 0,
+          "unknownSeats": 0,
+          "rows": []
+        }
+      ],
+      "totalSeats": 657,
+      "availableSeats": 657,
+      "soldSeats": 0,
+      "unknownSeats": 0,
+      "gross": 0,
+      "occupancyPercent": 0,
+      "source": {
+        "method": "bms-india-showtimes",
+        "capturedAt": "2026-05-05T04:47:11.496Z"
+      }
+    },
+    {
+      "id": "ASRM-8379",
+      "eventCode": "ET00493107",
+      "sessionId": "8379",
+      "venueCode": "ASRM",
+      "venueName": "ASR A/C 4K Laser Dolby Surround 7.1: Madanapalle",
+      "theatreShortName": "ASR",
+      "citySlug": "madanapalle",
+      "showDate": "2026-05-05",
+      "showDateCode": "20260505",
+      "showDateTime": "2026-05-05T15:45:00.000Z",
+      "showDateTimeCode": "202605052115",
+      "showTimeLabel": "09:15 PM",
+      "cutoffAt": "2026-05-05T16:00:00.000Z",
+      "cutoffCode": "202605052130",
+      "format": "2D",
+      "language": "Telugu",
+      "title": "GaayaPadda Simham - Telugu",
+      "releaseLabel": "GaayaPadda Simham",
+      "censor": "UA16",
+      "genres": [
+        "Action",
+        "Drama"
+      ],
+      "trailerUrl": "https://www.youtube.com/watch?v=j5W446fgx7A",
+      "screenName": "ASR",
+      "bookingUrl": "https://in.bookmyshow.com/cinemas/madanapalle/asr-a-c-4k-laser-dolby-surround-71-madanapalle/buytickets/ASRM/20260505",
+      "seatLayoutUrl": "https://in.bookmyshow.com/movies/madanapalle/seat-layout/ET00493107/ASRM/8379/20260505",
+      "categories": [
+        {
+          "name": "RESERVED",
+          "label": "RESERVED",
+          "price": 105,
+          "totalSeats": 386,
+          "availableSeats": 386,
+          "soldSeats": 0,
+          "unknownSeats": 0,
+          "rows": []
+        },
+        {
+          "name": "SECOND CLASS",
+          "label": "SECOND CLASS",
+          "price": 84,
+          "totalSeats": 134,
+          "availableSeats": 134,
+          "soldSeats": 0,
+          "unknownSeats": 0,
+          "rows": []
+        }
+      ],
+      "totalSeats": 520,
+      "availableSeats": 520,
+      "soldSeats": 0,
+      "unknownSeats": 0,
+      "gross": 0,
+      "occupancyPercent": 0,
+      "source": {
+        "method": "bms-india-showtimes",
+        "capturedAt": "2026-05-05T04:47:09.557Z"
+      }
+    },
+    {
+      "id": "RTDM-16168",
+      "eventCode": "ET00380715",
+      "sessionId": "16168",
+      "venueCode": "RTDM",
+      "venueName": "Ravi A/C 4K Laser Dolby Surround 7.1: Madanapalle",
+      "theatreShortName": "Ravi",
+      "citySlug": "madanapalle",
+      "showDate": "2026-05-05",
+      "showDateCode": "20260505",
+      "showDateTime": "2026-05-05T15:45:00.000Z",
+      "showDateTimeCode": "202605052115",
+      "showTimeLabel": "09:15 PM",
+      "cutoffAt": "2026-05-05T16:15:00.000Z",
+      "cutoffCode": "202605052145",
+      "format": "2D",
+      "language": "Telugu",
+      "title": "Dacoit - Telugu",
+      "releaseLabel": "Dacoit",
+      "censor": "UA13",
+      "genres": [
+        "Action",
+        "Drama",
+        "Romantic",
+        "Thriller"
+      ],
+      "trailerUrl": "https://www.youtube.com/watch?v=Hxe5D0VMmas",
+      "screenName": "Ravi",
+      "bookingUrl": "https://in.bookmyshow.com/cinemas/madanapalle/ravi-a-c-4k-laser-dolby-surround-71-madanapalle/buytickets/RTDM/20260505",
+      "seatLayoutUrl": "https://in.bookmyshow.com/movies/madanapalle/seat-layout/ET00380715/RTDM/16168/20260505",
+      "categories": [
+        {
+          "name": "BALCONY",
+          "label": "BALCONY",
+          "price": 105,
+          "totalSeats": 132,
+          "availableSeats": 129,
+          "soldSeats": 3,
+          "unknownSeats": 0,
+          "rows": []
+        },
+        {
+          "name": "RESERVED",
+          "label": "RESERVED",
+          "price": 105,
+          "totalSeats": 213,
+          "availableSeats": 213,
+          "soldSeats": 0,
+          "unknownSeats": 0,
+          "rows": []
+        },
+        {
+          "name": "FIRST CLASS",
+          "label": "FIRST CLASS",
+          "price": 105,
+          "totalSeats": 112,
+          "availableSeats": 112,
+          "soldSeats": 0,
+          "unknownSeats": 0,
+          "rows": []
+        },
+        {
+          "name": "SECOND CLASS",
+          "label": "SECOND CLASS",
+          "price": 84,
+          "totalSeats": 180,
+          "availableSeats": 180,
+          "soldSeats": 0,
+          "unknownSeats": 0,
+          "rows": []
+        }
+      ],
+      "totalSeats": 637,
+      "availableSeats": 634,
+      "soldSeats": 3,
+      "unknownSeats": 0,
+      "gross": 315,
+      "occupancyPercent": 0.47,
+      "source": {
+        "method": "bms-india-showtimes",
+        "capturedAt": "2026-05-05T04:47:10.529Z"
+      }
+    },
+    {
+      "id": "MSDR-11932",
+      "eventCode": "ET00496966",
+      "sessionId": "11932",
+      "venueCode": "MSDR",
+      "venueName": "Siddartha Cinemas:Screen 2 Dolby Laser,Madanapalle",
+      "theatreShortName": "Siddartha",
+      "citySlug": "madanapalle",
+      "showDate": "2026-05-05",
+      "showDateCode": "20260505",
+      "showDateTime": "2026-05-05T15:45:00.000Z",
+      "showDateTimeCode": "202605052115",
+      "showTimeLabel": "09:15 PM",
+      "cutoffAt": "2026-05-05T16:15:00.000Z",
+      "cutoffCode": "202605052145",
+      "format": "2D",
+      "language": "Telugu",
+      "title": "Kara (Telugu) - Telugu",
+      "releaseLabel": "Kara",
+      "censor": "UA16",
+      "genres": [
+        "Action",
+        "Thriller"
+      ],
+      "trailerUrl": "https://www.youtube.com/watch?v=9p_BGN1swDQ",
+      "screenName": "Siddartha",
+      "bookingUrl": "https://in.bookmyshow.com/cinemas/madanapalle/siddartha-cinemasscreen-2-dolby-lasermadanapalle/buytickets/MSDR/20260505",
+      "seatLayoutUrl": "https://in.bookmyshow.com/movies/madanapalle/seat-layout/ET00496966/MSDR/11932/20260505",
+      "categories": [
+        {
+          "name": "Gold Class",
+          "label": "Gold Class",
+          "price": 105,
+          "totalSeats": 238,
+          "availableSeats": 238,
+          "soldSeats": 0,
+          "unknownSeats": 0,
+          "rows": []
+        },
+        {
+          "name": "Silver Class",
+          "label": "Silver Class",
+          "price": 84,
+          "totalSeats": 33,
+          "availableSeats": 33,
+          "soldSeats": 0,
+          "unknownSeats": 0,
+          "rows": []
+        }
+      ],
+      "totalSeats": 271,
+      "availableSeats": 271,
+      "soldSeats": 0,
+      "unknownSeats": 0,
+      "gross": 0,
+      "occupancyPercent": 0,
+      "source": {
+        "method": "bms-india-showtimes",
+        "capturedAt": "2026-05-05T04:47:11.008Z"
+      }
+    }
+  ],
+  "meta": {
+    "status": "ok",
+    "notes": []
+  }
+}
