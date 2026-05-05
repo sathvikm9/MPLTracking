@@ -24,6 +24,48 @@ function ticketLabel(value) {
   return `${number(count)} ticket${count === 1 ? "" : "s"}`;
 }
 
+function formatGeneratedAt(data) {
+  const raw = data?.generatedAt;
+  if (!raw) return data?.generatedAtLabel || "Unknown";
+
+  try {
+    return new Intl.DateTimeFormat("en-IN", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: true,
+      timeZone: data?.timezone || "Asia/Kolkata"
+    }).format(new Date(raw));
+  } catch {
+    return data?.generatedAtLabel || raw;
+  }
+}
+
+function snapshotAgeLabel(raw) {
+  if (!raw) return "Unknown age";
+
+  const then = new Date(raw).getTime();
+  const now = Date.now();
+
+  if (!Number.isFinite(then)) return "Unknown age";
+
+  const diffMinutes = Math.max(0, Math.round((now - then) / 60000));
+
+  if (diffMinutes < 1) return "Updated just now";
+  if (diffMinutes === 1) return "Updated 1 minute ago";
+  if (diffMinutes < 60) return `Updated ${diffMinutes} minutes ago`;
+
+  const diffHours = Math.round(diffMinutes / 60);
+  if (diffHours === 1) return "Updated 1 hour ago";
+  if (diffHours < 24) return `Updated ${diffHours} hours ago`;
+
+  const diffDays = Math.round(diffHours / 24);
+  return `Updated ${diffDays} day${diffDays === 1 ? "" : "s"} ago`;
+}
+
 function movieLabelFromShow(show) {
   const base = String(show.releaseLabel || show.title || "Unknown Movie")
     .replace(/\s+/g, " ")
@@ -83,13 +125,22 @@ function useDashboardData() {
   const [state, setState] = React.useState({
     loading: true,
     error: null,
-    data: null
+    data: null,
+    refreshing: false
   });
 
-  React.useEffect(() => {
-    let active = true;
+  const loadData = React.useCallback((mode = "initial") => {
+    const snapshotUrl = `./data/latest.json?ts=${Date.now()}`;
+    const isInitial = mode === "initial";
 
-    fetch("./data/latest.json", { cache: "no-store" })
+    setState((current) => ({
+      ...current,
+      loading: isInitial ? true : current.loading,
+      refreshing: !isInitial,
+      error: null
+    }));
+
+    return fetch(snapshotUrl, { cache: "no-store" })
       .then((response) => {
         if (!response.ok) {
           throw new Error(`Failed to load data: ${response.status}`);
@@ -97,29 +148,62 @@ function useDashboardData() {
 
         return response.json();
       })
-      .then((data) => {
-        if (!active) return;
+      .then((data) => ({ ok: true, data }))
+      .catch((error) => ({ ok: false, error }));
+  }, []);
+
+  React.useEffect(() => {
+    let active = true;
+
+    loadData("initial").then((result) => {
+      if (!active) return;
+
+      if (result.ok) {
         setState({
           loading: false,
+          refreshing: false,
           error: null,
-          data
+          data: result.data
         });
-      })
-      .catch((error) => {
-        if (!active) return;
-        setState({
-          loading: false,
-          error,
-          data: null
-        });
+        return;
+      }
+
+      setState({
+        loading: false,
+        refreshing: false,
+        error: result.error,
+        data: null
       });
+    });
 
     return () => {
       active = false;
     };
-  }, []);
+  }, [loadData]);
 
-  return state;
+  const refresh = React.useCallback(() => {
+    loadData("refresh").then((result) => {
+      setState((current) => {
+        if (result.ok) {
+          return {
+            loading: false,
+            refreshing: false,
+            error: null,
+            data: result.data
+          };
+        }
+
+        return {
+          ...current,
+          loading: false,
+          refreshing: false,
+          error: result.error
+        };
+      });
+    });
+  }, [loadData]);
+
+  return { ...state, refresh };
 }
 
 function StatCard({ eyebrow, value, caption, tone = "default" }) {
@@ -230,7 +314,7 @@ function MovieWiseBoard({ shows }) {
 }
 
 function App() {
-  const { loading, error, data } = useDashboardData();
+  const { loading, error, data, refreshing, refresh } = useDashboardData();
 
   if (loading) {
     return (
@@ -261,6 +345,8 @@ function App() {
   const shows = data.shows || [];
   const movies = data.movies || [];
   const theatres = data.theatres || [];
+  const generatedLabel = formatGeneratedAt(data);
+  const ageLabel = snapshotAgeLabel(data.generatedAt);
 
   return (
     <main className="app-shell">
@@ -273,6 +359,15 @@ function App() {
             source uses BookMyShow theatre discovery plus live category availability payloads in
             the same shape used by BFilmy-style trackers.
           </p>
+          <div className="hero__actions">
+            <button className="refresh-button" onClick={refresh} disabled={refreshing}>
+              {refreshing ? "Checking..." : "Check for newer snapshot"}
+            </button>
+            <p className="hero__note">
+              Browser refresh only reloads the latest published JSON. On GitHub Pages, new numbers
+              appear after the collector runs and a fresh deploy is published.
+            </p>
+          </div>
         </div>
         <div className="hero__meta">
           <div className="meta-pill">
@@ -280,8 +375,9 @@ function App() {
             <strong>{data.targetDate || "Unknown"}</strong>
           </div>
           <div className="meta-pill">
-            <span>Generated</span>
-            <strong>{data.generatedAtLabel || "Unknown"}</strong>
+            <span>Snapshot Generated</span>
+            <strong>{generatedLabel}</strong>
+            <small>{ageLabel}</small>
           </div>
           <div className="meta-pill">
             <span>Timezone</span>
