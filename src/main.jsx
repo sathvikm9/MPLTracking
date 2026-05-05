@@ -407,9 +407,8 @@ function useDashboardData(selectedDate, selectedTheatre) {
   const loadDashboard = React.useCallback(async () => {
     const config = await loadRuntimeConfig();
     const liveApiBase = normalizeLiveApiBase(config);
-    const indiaToday = getIndiaTodayIso();
     const localToday = getLocalTodayIso();
-    const proxyDateParam = selectedDate === indiaToday ? "today" : selectedDate;
+    const proxyDateParam = selectedDate;
     const staticPath =
       selectedDate === localToday
         ? `./data/latest.json?ts=${Date.now()}`
