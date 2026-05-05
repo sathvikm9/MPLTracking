@@ -11,6 +11,7 @@ on:
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  BMS_HEADLESS: true
 
 permissions:
   contents: read
@@ -42,7 +43,21 @@ jobs:
         run: npx playwright install --with-deps chromium
 
       - name: Collect live snapshot
+        if: github.event_name != 'push'
         run: npm run collect:today
+
+      - name: Reject empty snapshot
+        if: github.event_name != 'push'
+        run: |
+          node --input-type=module <<'EOF'
+          import fs from 'node:fs/promises';
+          const data = JSON.parse(await fs.readFile('./public/data/latest.json', 'utf8'));
+          const totalShows = Number(data?.summary?.totalShows || 0);
+          if (totalShows <= 0) {
+            throw new Error('Collector returned 0 shows; refusing to publish an empty snapshot.');
+          }
+          console.log(`Snapshot looks valid: ${totalShows} shows`);
+          EOF
 
       - name: Build site
         run: npm run build
