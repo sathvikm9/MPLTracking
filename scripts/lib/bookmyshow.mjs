@@ -84,6 +84,21 @@ function normalizeAvailabilityCategories(rawCategories) {
   });
 }
 
+function normalizeDiscoveredCategories(rawCategories) {
+  const categories = Array.isArray(rawCategories) ? rawCategories : [];
+
+  return categories.map((category) => ({
+    name: category.PriceDesc || category.name || "Category",
+    label: category.label || category.PriceDesc || category.name || "Category",
+    price: toNumber(category.CurPrice || category.price || category.Price || 0),
+    totalSeats: 0,
+    availableSeats: 0,
+    soldSeats: 0,
+    unknownSeats: 0,
+    rows: []
+  }));
+}
+
 function hasAvailabilityMetrics(categories) {
   return categories.some(
     (category) => category.totalSeats > 0 || category.availableSeats > 0 || category.soldSeats > 0
@@ -226,10 +241,17 @@ function buildFallbackSnapshots(discoveredShows) {
   return discoveredShows
     .map((show) => {
       const categories = normalizeAvailabilityCategories(show.rawCategories);
-      if (!hasAvailabilityMetrics(categories)) return null;
-      return buildSnapshotFromCategories(show, categories, "bookmyshow-theatre-discovery");
-    })
-    .filter(Boolean);
+
+      if (hasAvailabilityMetrics(categories)) {
+        return buildSnapshotFromCategories(show, categories, "bookmyshow-theatre-discovery");
+      }
+
+      return buildSnapshotFromCategories(
+        show,
+        normalizeDiscoveredCategories(show.rawCategories),
+        "bookmyshow-showtime-discovery"
+      );
+    });
 }
 
 function collectShowsFromTransformedData(theatre, transformed, dateCode, citySlug) {

@@ -55,7 +55,7 @@ Important:
 
 GitHub Pages alone cannot call the live showtime endpoints directly because the browser is blocked by CORS.
 
-For true per-refresh live data, this repo now includes a small Cloudflare Worker in [worker/wrangler.toml](/Users/sathvikmarpuri/Desktop/BookMyShow/worker/wrangler.toml) and [worker/src/index.js](/Users/sathvikmarpuri/Desktop/BookMyShow/worker/src/index.js).
+For true per-refresh live data, this repo now includes a small Cloudflare Worker in `worker/wrangler.toml` and `worker/src/index.js`.
 
 What it does:
 
@@ -70,7 +70,7 @@ cd worker
 npx wrangler deploy
 ```
 
-After deploy, copy the Worker URL and set it in [public/runtime-config.json](/Users/sathvikmarpuri/Desktop/BookMyShow/public/runtime-config.json):
+After deploy, copy the Worker URL and set it in `public/runtime-config.json`:
 
 ```json
 {
@@ -79,3 +79,5 @@ After deploy, copy the Worker URL and set it in [public/runtime-config.json](/Us
 ```
 
 Then redeploy the GitHub Pages frontend. Once that URL is configured, normal page refreshes will hit the live proxy and pull current numbers instead of only the last published JSON snapshot.
+
+If Cloudflare auth is not set up yet, there is also a Vercel-compatible proxy in `proxy-vercel/api/live.js`. Deploy that folder and point `public/runtime-config.json` at the deployed URL in the same way.

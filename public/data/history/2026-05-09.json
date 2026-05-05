@@ -1,0 +1,37 @@
+{
+  "version": 1,
+  "generatedAt": "2026-05-05T14:35:34.721Z",
+  "generatedAtLabel": "05-May-2026, 08:05:34 pm",
+  "targetDate": "2026-05-09",
+  "targetDateCode": "20260509",
+  "timezone": "Asia/Kolkata",
+  "city": {
+    "name": "Madanapalle",
+    "regionCode": "MDNP",
+    "timezone": "Asia/Kolkata",
+    "slug": "madanapalle",
+    "country": "India",
+    "state": "Andhra Pradesh"
+  },
+  "summary": {
+    "totalShows": 0,
+    "totalCapacity": 0,
+    "totalAvailable": 0,
+    "totalSold": 0,
+    "totalGross": 0,
+    "occupancyPercent": 0
+  },
+  "movies": [],
+  "theatres": [],
+  "shows": [],
+  "meta": {
+    "status": "ok",
+    "notes": [
+      "No showtime payload found for ASR.",
+      "No showtime payload found for Ravi.",
+      "No showtime payload found for Siddartha.",
+      "No showtime payload found for Sri Krishna.",
+      "No shows were discovered for the requested theatre set."
+    ]
+  }
+}

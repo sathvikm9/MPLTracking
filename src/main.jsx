@@ -3,6 +3,24 @@ import ReactDOM from "react-dom/client";
 
 import "./styles.css";
 
+const INDIA_TIMEZONE = "Asia/Kolkata";
+const DATE_WINDOW_DAYS = 5;
+const CITY_INFO = {
+  name: "Madanapalle",
+  regionCode: "MDNP",
+  timezone: INDIA_TIMEZONE,
+  slug: "madanapalle",
+  country: "India",
+  state: "Andhra Pradesh"
+};
+const THEATRE_OPTIONS = [
+  { value: "ALL", label: "All Theatres" },
+  { value: "ASRM", label: "ASR" },
+  { value: "RTDM", label: "Ravi" },
+  { value: "MSDR", label: "Siddartha" },
+  { value: "SKMD", label: "Sri Krishna" }
+];
+
 function currency(value) {
   return new Intl.NumberFormat("en-IN", {
     style: "currency",
@@ -27,7 +45,9 @@ function ticketLabel(value) {
 async function fetchJson(url) {
   const response = await fetch(url, { cache: "no-store" });
   if (!response.ok) {
-    throw new Error(`Failed to load data: ${response.status}`);
+    const error = new Error(`Failed to load data: ${response.status}`);
+    error.status = response.status;
+    throw error;
   }
 
   return response.json();
@@ -56,6 +76,186 @@ function annotateClientSource(data, source) {
   };
 }
 
+function buildSummaryFromShows(shows) {
+  const totalShows = shows.length;
+  const totalCapacity = shows.reduce((sum, show) => sum + Number(show.totalSeats || 0), 0);
+  const totalAvailable = shows.reduce((sum, show) => sum + Number(show.availableSeats || 0), 0);
+  const totalSold = shows.reduce((sum, show) => sum + Number(show.soldSeats || 0), 0);
+  const totalGross = shows.reduce((sum, show) => sum + Number(show.gross || 0), 0);
+
+  return {
+    totalShows,
+    totalCapacity,
+    totalAvailable,
+    totalSold,
+    totalGross,
+    occupancyPercent: totalCapacity
+      ? Number(((totalSold / totalCapacity) * 100).toFixed(2))
+      : 0
+  };
+}
+
+function summarizeMoviesFromShows(shows) {
+  const map = new Map();
+
+  for (const show of shows) {
+    if (!map.has(show.eventCode)) {
+      map.set(show.eventCode, {
+        eventCode: show.eventCode,
+        title: show.releaseLabel || show.title,
+        displayTitle: show.title,
+        language: show.language,
+        format: show.format,
+        censor: show.censor,
+        genres: show.genres,
+        totalShows: 0,
+        totalCapacity: 0,
+        totalAvailable: 0,
+        totalSold: 0,
+        totalGross: 0,
+        venueCodes: new Set()
+      });
+    }
+
+    const entry = map.get(show.eventCode);
+    entry.totalShows += 1;
+    entry.totalCapacity += Number(show.totalSeats || 0);
+    entry.totalAvailable += Number(show.availableSeats || 0);
+    entry.totalSold += Number(show.soldSeats || 0);
+    entry.totalGross += Number(show.gross || 0);
+    entry.venueCodes.add(show.venueCode);
+  }
+
+  return Array.from(map.values())
+    .map((entry) => ({
+      ...entry,
+      venueCount: entry.venueCodes.size,
+      occupancyPercent: entry.totalCapacity
+        ? Number(((entry.totalSold / entry.totalCapacity) * 100).toFixed(2))
+        : 0
+    }))
+    .sort((left, right) => right.totalSold - left.totalSold || left.title.localeCompare(right.title));
+}
+
+function summarizeTheatresFromShows(shows) {
+  const map = new Map();
+
+  for (const show of shows) {
+    if (!map.has(show.venueCode)) {
+      map.set(show.venueCode, {
+        venueCode: show.venueCode,
+        name: show.venueName,
+        shortName: show.theatreShortName,
+        totalShows: 0,
+        totalCapacity: 0,
+        totalAvailable: 0,
+        totalSold: 0,
+        totalGross: 0
+      });
+    }
+
+    const entry = map.get(show.venueCode);
+    entry.totalShows += 1;
+    entry.totalCapacity += Number(show.totalSeats || 0);
+    entry.totalAvailable += Number(show.availableSeats || 0);
+    entry.totalSold += Number(show.soldSeats || 0);
+    entry.totalGross += Number(show.gross || 0);
+  }
+
+  return Array.from(map.values())
+    .map((entry) => ({
+      ...entry,
+      occupancyPercent: entry.totalCapacity
+        ? Number(((entry.totalSold / entry.totalCapacity) * 100).toFixed(2))
+        : 0
+    }))
+    .sort((left, right) => right.totalSold - left.totalSold || left.shortName.localeCompare(right.shortName));
+}
+
+function buildEmptyDataset(targetDate, notes = []) {
+  return {
+    version: 1,
+    generatedAt: new Date().toISOString(),
+    targetDate,
+    targetDateCode: targetDate.replaceAll("-", ""),
+    timezone: CITY_INFO.timezone,
+    city: CITY_INFO,
+    summary: buildSummaryFromShows([]),
+    movies: [],
+    theatres: [],
+    shows: [],
+    meta: {
+      status: "ok",
+      notes
+    }
+  };
+}
+
+function getIndiaTodayIso() {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: INDIA_TIMEZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).format(new Date());
+}
+
+function getLocalTodayIso() {
+  const date = new Date();
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function addDaysToIsoDate(isoDate, days) {
+  const [year, month, day] = isoDate.split("-").map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
+function formatDateButtonParts(isoDate) {
+  const date = new Date(`${isoDate}T00:00:00+05:30`);
+  return {
+    weekday: new Intl.DateTimeFormat("en-US", {
+      timeZone: INDIA_TIMEZONE,
+      weekday: "short"
+    }).format(date),
+    day: new Intl.DateTimeFormat("en-US", {
+      timeZone: INDIA_TIMEZONE,
+      day: "2-digit"
+    }).format(date),
+    month: new Intl.DateTimeFormat("en-US", {
+      timeZone: INDIA_TIMEZONE,
+      month: "short"
+    }).format(date)
+  };
+}
+
+function formatSelectedDateLabel(isoDate) {
+  const date = new Date(`${isoDate}T00:00:00+05:30`);
+  return new Intl.DateTimeFormat("en-IN", {
+    timeZone: INDIA_TIMEZONE,
+    weekday: "short",
+    day: "2-digit",
+    month: "short",
+    year: "numeric"
+  }).format(date);
+}
+
+function buildDateOptions() {
+  const today = getLocalTodayIso();
+
+  return Array.from({ length: DATE_WINDOW_DAYS }, (_, index) => {
+    const isoDate = addDaysToIsoDate(today, index);
+    return {
+      value: isoDate,
+      ...formatDateButtonParts(isoDate)
+    };
+  });
+}
+
 function formatGeneratedAt(data) {
   const raw = data?.generatedAt;
   if (!raw) return data?.generatedAtLabel || "Unknown";
@@ -69,7 +269,7 @@ function formatGeneratedAt(data) {
       minute: "2-digit",
       second: "2-digit",
       hour12: true,
-      timeZone: data?.timezone || "Asia/Kolkata"
+      timeZone: data?.timezone || INDIA_TIMEZONE
     }).format(new Date(raw));
   } catch {
     return data?.generatedAtLabel || raw;
@@ -153,7 +353,7 @@ function buildMovieWiseGroups(shows) {
     );
 }
 
-function useDashboardData() {
+function useDashboardData(selectedDate) {
   const [state, setState] = React.useState({
     loading: true,
     error: null,
@@ -164,64 +364,123 @@ function useDashboardData() {
   const loadDashboard = React.useCallback(async () => {
     const config = await loadRuntimeConfig();
     const liveApiBase = normalizeLiveApiBase(config);
+    const indiaToday = getIndiaTodayIso();
+    const localToday = getLocalTodayIso();
+    const proxyDateParam = selectedDate === indiaToday ? "today" : selectedDate;
+    const staticPath =
+      selectedDate === localToday
+        ? `./data/latest.json?ts=${Date.now()}`
+        : `./data/history/${selectedDate}.json?ts=${Date.now()}`;
 
     if (liveApiBase) {
       try {
-        const liveData = await fetchJson(`${liveApiBase}/api/live?date=today&ts=${Date.now()}`);
+        const liveData = await fetchJson(
+          `${liveApiBase}/api/live?date=${proxyDateParam}&ts=${Date.now()}`
+        );
+        if (liveData.targetDate !== selectedDate) {
+          throw new Error(
+            `Live proxy returned ${liveData.targetDate || "unknown date"} for ${selectedDate}`
+          );
+        }
+
         return {
           ok: true,
           data: annotateClientSource(liveData, {
             mode: "live-proxy",
-            liveApiBase
+            liveApiBase,
+            selectedDate
           })
         };
       } catch (error) {
-        const snapshot = await fetchJson(`./data/latest.json?ts=${Date.now()}`);
-        const fallback = annotateClientSource(snapshot, {
-          mode: "published-snapshot",
-          liveApiBase,
-          fallbackReason: error.message
-        });
+        try {
+          const snapshot = await fetchJson(staticPath);
+          const fallback = annotateClientSource(snapshot, {
+            mode: "published-snapshot",
+            liveApiBase,
+            selectedDate,
+            fallbackReason: error.message
+          });
 
-        return {
-          ok: true,
-          data: {
-            ...fallback,
-            meta: {
-              ...(fallback.meta || {}),
-              notes: [
-                `Live proxy fallback: ${error.message}`,
-                ...((fallback.meta && fallback.meta.notes) || [])
-              ]
+          return {
+            ok: true,
+            data: {
+              ...fallback,
+              meta: {
+                ...(fallback.meta || {}),
+                notes: [
+                  `Live proxy fallback: ${error.message}`,
+                  ...((fallback.meta && fallback.meta.notes) || [])
+                ]
+              }
             }
-          }
-        };
+          };
+        } catch (snapshotError) {
+          return {
+            ok: true,
+            data: annotateClientSource(
+              buildEmptyDataset(selectedDate, [
+                `No shows were found for ${selectedDate}.`,
+                "The selected date does not have a published snapshot yet."
+              ]),
+              {
+                mode: "live-proxy",
+                liveApiBase,
+                selectedDate,
+                fallbackReason: error.message
+              }
+            )
+          };
+        }
       }
     }
 
-    const snapshot = await fetchJson(`./data/latest.json?ts=${Date.now()}`);
-    return {
-      ok: true,
-      data: annotateClientSource(snapshot, {
-        mode: "published-snapshot",
-        liveApiBase: ""
-      })
-    };
-  }, []);
+    try {
+      const snapshot = await fetchJson(staticPath);
+      return {
+        ok: true,
+        data: annotateClientSource(snapshot, {
+          mode: "published-snapshot",
+          liveApiBase: "",
+          selectedDate
+        })
+      };
+    } catch (error) {
+      if (error.status === 404) {
+        return {
+          ok: true,
+          data: annotateClientSource(
+            buildEmptyDataset(selectedDate, [
+              `No shows were found for ${selectedDate}.`,
+              "The selected date does not have a published snapshot yet."
+            ]),
+            {
+              mode: "published-snapshot",
+              liveApiBase: "",
+              selectedDate
+            }
+          )
+        };
+      }
 
-  const loadData = React.useCallback((mode = "initial") => {
-    const isInitial = mode === "initial";
+      throw error;
+    }
+  }, [selectedDate]);
 
-    setState((current) => ({
-      ...current,
-      loading: isInitial ? true : current.loading,
-      refreshing: !isInitial,
-      error: null
-    }));
+  const loadData = React.useCallback(
+    (mode = "initial") => {
+      const isInitial = mode === "initial";
 
-    return loadDashboard()
-      .catch((error) => ({ ok: false, error }));
-  }, [loadDashboard]);
+      setState((current) => ({
+        ...current,
+        loading: isInitial ? true : current.loading,
+        refreshing: !isInitial,
+        error: null
+      }));
+
+      return loadDashboard().catch((error) => ({ ok: false, error }));
+    },
+    [loadDashboard]
+  );
 
   React.useEffect(() => {
     let active = true;
@@ -346,11 +605,11 @@ function Notes({ notes }) {
   );
 }
 
-function MovieWiseBoard({ shows }) {
+function MovieWiseBoard({ shows, emptyMessage }) {
   const groups = buildMovieWiseGroups(shows);
 
   if (!groups.length) {
-    return <div className="empty-state">No show snapshots yet.</div>;
+    return <div className="empty-state">{emptyMessage}</div>;
   }
 
   return (
@@ -385,7 +644,10 @@ function MovieWiseBoard({ shows }) {
 }
 
 function App() {
-  const { loading, error, data, refreshing, refresh } = useDashboardData();
+  const dateOptions = buildDateOptions();
+  const [selectedDate, setSelectedDate] = React.useState(dateOptions[0]?.value || getLocalTodayIso());
+  const [selectedTheatre, setSelectedTheatre] = React.useState("ALL");
+  const { loading, error, data, refreshing, refresh } = useDashboardData(selectedDate);
 
   if (loading) {
     return (
@@ -412,10 +674,14 @@ function App() {
     );
   }
 
-  const summary = data.summary || {};
-  const shows = data.shows || [];
-  const movies = data.movies || [];
-  const theatres = data.theatres || [];
+  const allShows = [...(data.shows || [])].sort(compareShows);
+  const filteredShows =
+    selectedTheatre === "ALL"
+      ? allShows
+      : allShows.filter((show) => show.venueCode === selectedTheatre);
+  const summary = buildSummaryFromShows(filteredShows);
+  const movies = summarizeMoviesFromShows(filteredShows);
+  const theatres = summarizeTheatresFromShows(filteredShows);
   const generatedLabel = formatGeneratedAt(data);
   const ageLabel = snapshotAgeLabel(data.generatedAt);
   const clientSource = data.meta?.clientSource || {};
@@ -428,6 +694,15 @@ function App() {
   const sourceNote = isLiveProxy
     ? "Each page refresh asks the live proxy for current seat counts."
     : "Browser refresh only reloads the latest published JSON. On GitHub Pages, new numbers appear after the collector runs and a fresh deploy is published.";
+  const selectedTheatreLabel =
+    THEATRE_OPTIONS.find((option) => option.value === selectedTheatre)?.label || "All Theatres";
+  const hasDiscoveryOnlyShows =
+    filteredShows.length > 0 &&
+    filteredShows.every((show) => show.source?.method === "bookmyshow-showtime-discovery");
+  const emptyMessage =
+    selectedTheatre === "ALL"
+      ? `No shows found for ${formatSelectedDateLabel(selectedDate)}.`
+      : `No shows found for ${selectedTheatreLabel} on ${formatSelectedDateLabel(selectedDate)}.`;
 
   return (
     <main className="app-shell">
@@ -436,10 +711,50 @@ function App() {
           <p className="hero__eyebrow">Madanapalle Live Tracker</p>
           <h1>City-wide BookMyShow tracking built for Madanapalle.</h1>
           <p className="hero__lede">
-            Static-site friendly dashboard powered by generated JSON snapshots. The current data
-            source uses BookMyShow theatre discovery plus live category availability payloads in
-            the same shape used by BFilmy-style trackers.
+            Switch dates like May 05, May 06, and May 07, then narrow the snapshot by theatre.
+            If BookMyShow has no shows for the selected date, the dashboard stays empty instead of
+            reusing stale numbers.
           </p>
+
+          <div className="selector-shell">
+            <div className="date-strip" aria-label="Date selection">
+              {dateOptions.map((option) => (
+                <button
+                  key={option.value}
+                  className={`date-chip${selectedDate === option.value ? " date-chip--active" : ""}`}
+                  onClick={() => setSelectedDate(option.value)}
+                  type="button"
+                >
+                  <span className="date-chip__weekday">{option.weekday}</span>
+                  <strong className="date-chip__day">{option.day}</strong>
+                  <span className="date-chip__month">{option.month}</span>
+                </button>
+              ))}
+            </div>
+
+            <label className="selector-select-shell">
+              <span className="selector-select__label">Theatre</span>
+              <select
+                className="selector-select"
+                value={selectedTheatre}
+                onChange={(event) => setSelectedTheatre(event.target.value)}
+              >
+                {THEATRE_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+
+          {hasDiscoveryOnlyShows ? (
+            <div className="live-status-note">
+              Showtimes are available for this date, but BookMyShow has not exposed live seat counts
+              through the category payload yet.
+            </div>
+          ) : null}
+
           <div className="hero__actions">
             <button className="refresh-button" onClick={refresh} disabled={refreshing}>
               {refreshButtonLabel}
@@ -447,10 +762,15 @@ function App() {
             <p className="hero__note">{sourceNote}</p>
           </div>
         </div>
+
         <div className="hero__meta">
           <div className="meta-pill">
-            <span>Target Date</span>
-            <strong>{data.targetDate || "Unknown"}</strong>
+            <span>Selected Date</span>
+            <strong>{formatSelectedDateLabel(selectedDate)}</strong>
+          </div>
+          <div className="meta-pill">
+            <span>Theatre Filter</span>
+            <strong>{selectedTheatreLabel}</strong>
           </div>
           <div className="meta-pill">
             <span>Snapshot Generated</span>
@@ -460,10 +780,6 @@ function App() {
           <div className="meta-pill">
             <span>Source Mode</span>
             <strong>{isLiveProxy ? "Live Proxy" : "Published Snapshot"}</strong>
-          </div>
-          <div className="meta-pill">
-            <span>Timezone</span>
-            <strong>{data.timezone}</strong>
           </div>
         </div>
       </section>
@@ -484,22 +800,22 @@ function App() {
         <StatCard
           eyebrow="Gross"
           value={currency(summary.totalGross)}
-          caption={`${number(summary.totalShows)} shows in the current snapshot`}
+          caption={`${number(summary.totalShows)} shows in the current selection`}
           tone="ink"
         />
         <StatCard
           eyebrow="Coverage"
-          value={`${theatres.length} theatres`}
-          caption={`${movies.length} movies tracked in this dataset`}
+          value={`${selectedTheatre === "ALL" ? theatres.length : filteredShows.length ? 1 : 0} theatres`}
+          caption={`${movies.length} movies tracked in this selection`}
         />
       </section>
 
       <Section
         title="Movie-wise Ticket Lines"
         kicker="Every show in theatre, time, movie, tickets format"
-        aside={<span className="section__hint">{shows.length} show lines</span>}
+        aside={<span className="section__hint">{filteredShows.length} show lines</span>}
       >
-        <MovieWiseBoard shows={shows} />
+        <MovieWiseBoard shows={filteredShows} emptyMessage={emptyMessage} />
       </Section>
 
       <Section
@@ -516,7 +832,7 @@ function App() {
                 <div>
                   <strong>{movie.title}</strong>
                   <div className="table-subline">
-                    {movie.language} · {movie.format} · {movie.venueCount} venues
+                    {movie.language || "Unknown"} · {movie.format || "Unknown"} · {movie.venueCount} venues
                   </div>
                 </div>
               )
@@ -546,7 +862,7 @@ function App() {
             ...movie,
             id: movie.eventCode
           }))}
-          emptyMessage="No movie data yet."
+          emptyMessage={emptyMessage}
         />
       </Section>
 
@@ -592,14 +908,14 @@ function App() {
             ...theatre,
             id: theatre.venueCode
           }))}
-          emptyMessage="No theatre totals yet."
+          emptyMessage={emptyMessage}
         />
       </Section>
 
       <Section
         title="Show Ledger"
         kicker="Every show captured in the latest run"
-        aside={<span className="section__hint">{shows.length} show snapshots</span>}
+        aside={<span className="section__hint">{filteredShows.length} show snapshots</span>}
       >
         <Table
           columns={[
@@ -648,8 +964,8 @@ function App() {
               render: (show) => currency(show.gross)
             }
           ]}
-          rows={shows}
-          emptyMessage="No show snapshots yet."
+          rows={filteredShows}
+          emptyMessage={emptyMessage}
         />
       </Section>
 
@@ -659,21 +975,20 @@ function App() {
             <h3>Static-first architecture</h3>
             <p>
               This app reads from generated JSON files so it can be published on GitHub Pages
-              without a live backend.
+              without a full custom backend.
             </p>
           </article>
           <article className="caveat-card">
             <h3>Live category payload</h3>
             <p>
-              The collector prefers live `MaxSeats` and `SeatsAvail` category counts, then derives
-              sold seats from the same BookMyShow-style showtime data model used by box-office
-              trackers.
+              The tracker prefers live `MaxSeats` and `SeatsAvail` counts when BookMyShow exposes
+              them, and falls back to showtime discovery when future dates only publish schedule data.
             </p>
           </article>
           <article className="caveat-card">
             <h3>Cutoff handling</h3>
             <p>
-              We prefer BookMyShow's live cutoff when present, and fall back to theatre-specific
+              We prefer BookMyShow&apos;s live cutoff when present, and fall back to theatre-specific
               cutoff rules when it is missing.
             </p>
           </article>

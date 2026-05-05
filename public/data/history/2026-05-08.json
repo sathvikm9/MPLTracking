@@ -1,0 +1,244 @@
+{
+  "version": 1,
+  "generatedAt": "2026-05-05T14:35:10.409Z",
+  "generatedAtLabel": "05-May-2026, 08:05:10 pm",
+  "targetDate": "2026-05-08",
+  "targetDateCode": "20260508",
+  "timezone": "Asia/Kolkata",
+  "city": {
+    "name": "Madanapalle",
+    "regionCode": "MDNP",
+    "timezone": "Asia/Kolkata",
+    "slug": "madanapalle",
+    "country": "India",
+    "state": "Andhra Pradesh"
+  },
+  "summary": {
+    "totalShows": 2,
+    "totalCapacity": 0,
+    "totalAvailable": 0,
+    "totalSold": 0,
+    "totalGross": 0,
+    "occupancyPercent": 0
+  },
+  "movies": [
+    {
+      "eventCode": "ET00053894",
+      "title": "Ninnu Kori",
+      "displayTitle": "Ninnu Kori - Telugu",
+      "language": "",
+      "format": "2D",
+      "censor": "U",
+      "genres": [
+        "Drama",
+        "Romantic"
+      ],
+      "totalShows": 2,
+      "totalCapacity": 0,
+      "totalAvailable": 0,
+      "totalSold": 0,
+      "totalGross": 0,
+      "venueCodes": {},
+      "venueCount": 1,
+      "occupancyPercent": 0
+    }
+  ],
+  "theatres": [
+    {
+      "venueCode": "ASRM",
+      "name": "ASR A/C 4K Laser Dolby Surround 7.1: Madanapalle",
+      "shortName": "ASR",
+      "totalShows": 2,
+      "totalCapacity": 0,
+      "totalAvailable": 0,
+      "totalSold": 0,
+      "totalGross": 0,
+      "occupancyPercent": 0
+    }
+  ],
+  "shows": [
+    {
+      "id": "ASRM-8388",
+      "eventCode": "ET00053894",
+      "sessionId": "8388",
+      "venueCode": "ASRM",
+      "venueName": "ASR A/C 4K Laser Dolby Surround 7.1: Madanapalle",
+      "theatreShortName": "ASR",
+      "citySlug": "madanapalle",
+      "showDate": "2026-05-08",
+      "showDateCode": "20260508",
+      "showDateTime": "2026-05-08T02:00:00.000Z",
+      "showDateTimeCode": "202605080730",
+      "showTimeLabel": "07:30 AM",
+      "cutoffAt": "2026-05-08T02:15:00.000Z",
+      "cutoffCode": "202605080745",
+      "format": "2D",
+      "language": "",
+      "title": "Ninnu Kori - Telugu",
+      "releaseLabel": "Ninnu Kori",
+      "censor": "U",
+      "genres": [
+        "Drama",
+        "Romantic"
+      ],
+      "trailerUrl": "https://www.youtube.com/watch?v=Ia6EXfqKiV4",
+      "screenName": "ASR Movie Land",
+      "bookingUrl": "https://in.bookmyshow.com/cinemas/madanapalle/asr-a-c-4k-laser-dolby-surround-71-madanapalle/buytickets/ASRM/20260508",
+      "seatLayoutUrl": "https://in.bookmyshow.com/movies/madanapalle/seat-layout/ET00053894/ASRM/8388/20260508",
+      "rawCategories": [
+        {
+          "PriceCode": "0001",
+          "AdditionalData": "",
+          "CurPrice": "105.00",
+          "UpdatedPrice": null,
+          "AreaCatCode": "0000000001",
+          "AvailStatus": "3",
+          "BestAvailableSeats": "0",
+          "SeatLayout": "Y",
+          "PriceDesc": "RESERVED",
+          "CategoryRange": "1|2|3|4"
+        },
+        {
+          "PriceCode": "0003",
+          "AdditionalData": "",
+          "CurPrice": "84.00",
+          "UpdatedPrice": null,
+          "AreaCatCode": "0000000003",
+          "AvailStatus": "3",
+          "BestAvailableSeats": "0",
+          "SeatLayout": "Y",
+          "PriceDesc": "SECOND CLASS",
+          "CategoryRange": "1|2|3|4"
+        }
+      ],
+      "categories": [
+        {
+          "name": "RESERVED",
+          "label": "RESERVED",
+          "price": 105,
+          "totalSeats": 0,
+          "availableSeats": 0,
+          "soldSeats": 0,
+          "unknownSeats": 0,
+          "rows": []
+        },
+        {
+          "name": "SECOND CLASS",
+          "label": "SECOND CLASS",
+          "price": 84,
+          "totalSeats": 0,
+          "availableSeats": 0,
+          "soldSeats": 0,
+          "unknownSeats": 0,
+          "rows": []
+        }
+      ],
+      "totalSeats": 0,
+      "availableSeats": 0,
+      "soldSeats": 0,
+      "unknownSeats": 0,
+      "gross": 0,
+      "occupancyPercent": 0,
+      "source": {
+        "method": "bookmyshow-showtime-discovery",
+        "capturedAt": "2026-05-05T14:35:08.840Z"
+      }
+    },
+    {
+      "id": "ASRM-8389",
+      "eventCode": "ET00053894",
+      "sessionId": "8389",
+      "venueCode": "ASRM",
+      "venueName": "ASR A/C 4K Laser Dolby Surround 7.1: Madanapalle",
+      "theatreShortName": "ASR",
+      "citySlug": "madanapalle",
+      "showDate": "2026-05-08",
+      "showDateCode": "20260508",
+      "showDateTime": "2026-05-08T05:30:00.000Z",
+      "showDateTimeCode": "202605081100",
+      "showTimeLabel": "11:00 AM",
+      "cutoffAt": "2026-05-08T05:45:00.000Z",
+      "cutoffCode": "202605081115",
+      "format": "2D",
+      "language": "",
+      "title": "Ninnu Kori - Telugu",
+      "releaseLabel": "Ninnu Kori",
+      "censor": "U",
+      "genres": [
+        "Drama",
+        "Romantic"
+      ],
+      "trailerUrl": "https://www.youtube.com/watch?v=Ia6EXfqKiV4",
+      "screenName": "ASR Movie Land",
+      "bookingUrl": "https://in.bookmyshow.com/cinemas/madanapalle/asr-a-c-4k-laser-dolby-surround-71-madanapalle/buytickets/ASRM/20260508",
+      "seatLayoutUrl": "https://in.bookmyshow.com/movies/madanapalle/seat-layout/ET00053894/ASRM/8389/20260508",
+      "rawCategories": [
+        {
+          "PriceCode": "0001",
+          "AdditionalData": "",
+          "CurPrice": "105.00",
+          "UpdatedPrice": null,
+          "AreaCatCode": "0000000001",
+          "AvailStatus": "3",
+          "BestAvailableSeats": "0",
+          "SeatLayout": "Y",
+          "PriceDesc": "RESERVED",
+          "CategoryRange": "1|2|3|4"
+        },
+        {
+          "PriceCode": "0003",
+          "AdditionalData": "",
+          "CurPrice": "84.00",
+          "UpdatedPrice": null,
+          "AreaCatCode": "0000000003",
+          "AvailStatus": "3",
+          "BestAvailableSeats": "0",
+          "SeatLayout": "Y",
+          "PriceDesc": "SECOND CLASS",
+          "CategoryRange": "1|2|3|4"
+        }
+      ],
+      "categories": [
+        {
+          "name": "RESERVED",
+          "label": "RESERVED",
+          "price": 105,
+          "totalSeats": 0,
+          "availableSeats": 0,
+          "soldSeats": 0,
+          "unknownSeats": 0,
+          "rows": []
+        },
+        {
+          "name": "SECOND CLASS",
+          "label": "SECOND CLASS",
+          "price": 84,
+          "totalSeats": 0,
+          "availableSeats": 0,
+          "soldSeats": 0,
+          "unknownSeats": 0,
+          "rows": []
+        }
+      ],
+      "totalSeats": 0,
+      "availableSeats": 0,
+      "soldSeats": 0,
+      "unknownSeats": 0,
+      "gross": 0,
+      "occupancyPercent": 0,
+      "source": {
+        "method": "bookmyshow-showtime-discovery",
+        "capturedAt": "2026-05-05T14:35:08.841Z"
+      }
+    }
+  ],
+  "meta": {
+    "status": "ok",
+    "notes": [
+      "No showtime payload found for Ravi.",
+      "Failed to discover shows for Siddartha: page.waitForFunction: Timeout 30000ms exceeded.",
+      "No showtime payload found for Sri Krishna.",
+      "Showtime API fallback failed for ET00053894: 500 Internal Server Error: {\"error\":\"Failed to parse JSON from response\",\"details\":\"Expected property name or '}' in JSON at position 1 (line 1 column 2)\"}"
+    ]
+  }
+}
