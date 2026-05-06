@@ -389,6 +389,7 @@ async function refreshLiveSnapshot(baseline, fetchImpl) {
   const snapshotsById = new Map();
   const successfulEventCodes = [];
   const failedEventCodes = [];
+  const cachedEventCodes = [];
 
   for (const show of baseShows) {
     snapshotsById.set(show.id, show);
@@ -397,11 +398,15 @@ async function refreshLiveSnapshot(baseline, fetchImpl) {
   const uniqueEventCodes = [...new Set(baseShows.map((show) => show.eventCode).filter(Boolean))];
   for (const eventCode of uniqueEventCodes) {
     try {
-      const { payload } = await fetchMadanapalleShowtimesPayload({
+      const { payload, meta } = await fetchMadanapalleShowtimesPayload({
         eventCode,
         dateCode: baseline.targetDateCode,
         fetchImpl
       });
+
+      if (meta?.cache?.hit) {
+        cachedEventCodes.push(eventCode);
+      }
 
       for (const snapshot of buildApiSnapshotsFromPayload(payload, theatreMap, baseShowIndex)) {
         snapshotsById.set(snapshot.id, snapshot);
@@ -428,6 +433,8 @@ async function refreshLiveSnapshot(baseline, fetchImpl) {
         successfulEvents: successfulEventCodes.length,
         failedEvents: failedEventCodes.length,
         failedEventCodes,
+        cachedEvents: cachedEventCodes.length,
+        cachedEventCodes,
         liveShowCount,
         fallbackShowCount: output.shows.length - liveShowCount
       }

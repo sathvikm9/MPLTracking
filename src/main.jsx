@@ -6,6 +6,8 @@ import "./styles.css";
 const INDIA_TIMEZONE = "Asia/Kolkata";
 const DATE_WINDOW_DAYS = 5;
 const DATE_WINDOW_PAST_DAYS = 1;
+const LAST_GOOD_DASHBOARD_CACHE_PREFIX = "mpltracking:last-good-live";
+const LAST_GOOD_DASHBOARD_CACHE_MAX_AGE_MS = 1000 * 60 * 60 * 6;
 const CITY_INFO = {
   name: "Madanapalle",
   regionCode: "MDNP",
@@ -396,6 +398,75 @@ function buildMovieWiseGroups(shows) {
     );
 }
 
+function dashboardCacheKey(selectedDate, selectedTheatre) {
+  return `${LAST_GOOD_DASHBOARD_CACHE_PREFIX}:${selectedDate}:${selectedTheatre}`;
+}
+
+function hasLiveSeatCounts(data) {
+  return (data?.shows || []).some((show) => show.source?.method === "live-proxy-showtimes");
+}
+
+function isLiveCountFailure(data) {
+  const liveRefresh = data?.meta?.liveRefresh || {};
+  const shows = data?.shows || [];
+  return (
+    shows.length > 0 &&
+    Number(liveRefresh.failedEvents || 0) > 0 &&
+    Number(liveRefresh.liveShowCount || 0) === 0
+  );
+}
+
+function readLastGoodDashboard(selectedDate, selectedTheatre) {
+  if (typeof window === "undefined") return null;
+
+  try {
+    const raw = window.localStorage.getItem(dashboardCacheKey(selectedDate, selectedTheatre));
+    if (!raw) return null;
+
+    const cached = JSON.parse(raw);
+    const ageMs = Date.now() - Number(cached.cachedAtMs || 0);
+    if (!cached.data || ageMs > LAST_GOOD_DASHBOARD_CACHE_MAX_AGE_MS) {
+      window.localStorage.removeItem(dashboardCacheKey(selectedDate, selectedTheatre));
+      return null;
+    }
+
+    return {
+      ...cached.data,
+      meta: {
+        ...(cached.data.meta || {}),
+        cacheFallback: {
+          hit: true,
+          cachedAt: cached.cachedAt,
+          ageMs
+        },
+        notes: [
+          `Using last successful live data from ${formatGeneratedAt(cached.data)} because the current mirror refresh failed.`,
+          ...((cached.data.meta && cached.data.meta.notes) || [])
+        ]
+      }
+    };
+  } catch {
+    return null;
+  }
+}
+
+function writeLastGoodDashboard(selectedDate, selectedTheatre, data) {
+  if (typeof window === "undefined" || !hasLiveSeatCounts(data)) return;
+
+  try {
+    window.localStorage.setItem(
+      dashboardCacheKey(selectedDate, selectedTheatre),
+      JSON.stringify({
+        cachedAt: new Date().toISOString(),
+        cachedAtMs: Date.now(),
+        data
+      })
+    );
+  } catch {
+    // Cache is best-effort; live rendering should never fail because storage is unavailable.
+  }
+}
+
 function useDashboardData(selectedDate, selectedTheatre) {
   const [state, setState] = React.useState({
     loading: true,
@@ -429,6 +500,24 @@ function useDashboardData(selectedDate, selectedTheatre) {
           throw new Error(
             `Live proxy returned ${liveData.targetDate || "unknown date"} for ${selectedDate}`
           );
+        }
+
+        if (hasLiveSeatCounts(liveData)) {
+          writeLastGoodDashboard(selectedDate, selectedTheatre, liveData);
+        } else if (isLiveCountFailure(liveData)) {
+          const cachedLiveData = readLastGoodDashboard(selectedDate, selectedTheatre);
+          if (cachedLiveData) {
+            return {
+              ok: true,
+              data: annotateClientSource(cachedLiveData, {
+                mode: "live-proxy",
+                liveApiBase,
+                selectedDate,
+                selectedTheatre,
+                fallbackReason: "Current mirror refresh failed; using browser last-good live data."
+              })
+            };
+          }
         }
 
         return {

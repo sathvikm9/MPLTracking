@@ -6,6 +6,7 @@ const SHOWTIME_API_BASE_URLS = [
 ];
 const SHOWTIME_API_RETRY_ROUNDS = 3;
 const SHOWTIME_API_RETRY_DELAY_MS = 700;
+const LAST_GOOD_CACHE_MAX_AGE_MS = 1000 * 60 * 60 * 6;
 
 const SHOWTIME_API_HEADERS = {
   accept: "application/json, text/plain, */*",
@@ -16,6 +17,10 @@ const SHOWTIME_API_HEADERS = {
   "user-agent":
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36"
 };
+
+const lastGoodPayloadCache =
+  globalThis.__MADANAPALLE_LAST_GOOD_SHOWTIME_PAYLOADS__ || new Map();
+globalThis.__MADANAPALLE_LAST_GOOD_SHOWTIME_PAYLOADS__ = lastGoodPayloadCache;
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -77,6 +82,60 @@ function summarizePayload(payload) {
   };
 }
 
+function buildCacheKey({ eventCode, dateCode }) {
+  return `${eventCode}:${dateCode}`;
+}
+
+function cloneJson(value) {
+  return JSON.parse(JSON.stringify(value));
+}
+
+function readLastGoodPayload({ eventCode, dateCode, venueCode, attempts }) {
+  const cacheKey = buildCacheKey({ eventCode, dateCode });
+  const cached = lastGoodPayloadCache.get(cacheKey);
+  if (!cached) return null;
+
+  const ageMs = Date.now() - cached.cachedAtMs;
+  if (ageMs > LAST_GOOD_CACHE_MAX_AGE_MS) {
+    lastGoodPayloadCache.delete(cacheKey);
+    return null;
+  }
+
+  const payload = filterPayloadByVenueCode(cloneJson(cached.payload), venueCode);
+  return {
+    payload,
+    meta: {
+      ...cached.meta,
+      venueCode: venueCode || "",
+      upstream: `${cached.meta.upstream} (last-good-cache)`,
+      attempts,
+      summary: summarizePayload(payload),
+      generatedAt: new Date().toISOString(),
+      cache: {
+        hit: true,
+        cachedAt: cached.cachedAt,
+        ageMs
+      }
+    }
+  };
+}
+
+function writeLastGoodPayload({ eventCode, dateCode, payload, meta }) {
+  lastGoodPayloadCache.set(buildCacheKey({ eventCode, dateCode }), {
+    payload: cloneJson(payload),
+    meta: {
+      ...meta,
+      venueCode: "",
+      summary: summarizePayload(payload),
+      cache: {
+        hit: false
+      }
+    },
+    cachedAt: new Date().toISOString(),
+    cachedAtMs: Date.now()
+  });
+}
+
 export async function fetchMadanapalleShowtimesPayload({
   eventCode,
   date,
@@ -127,19 +186,32 @@ export async function fetchMadanapalleShowtimesPayload({
           throw new Error("Missing ShowDetails in showtime payload");
         }
 
+        const fullPayload = cloneJson(payload);
         const filteredPayload = filterPayloadByVenueCode(payload, venueCode);
+        const meta = {
+          regionCode: MADANAPALLE_REGION_CODE,
+          eventCode: normalizedEventCode,
+          dateCode: normalizedDateCode,
+          venueCode: venueCode || "",
+          upstream: baseUrl,
+          attempts,
+          summary: summarizePayload(filteredPayload),
+          generatedAt: new Date().toISOString(),
+          cache: {
+            hit: false
+          }
+        };
+
+        writeLastGoodPayload({
+          eventCode: normalizedEventCode,
+          dateCode: normalizedDateCode,
+          payload: fullPayload,
+          meta
+        });
+
         return {
           payload: filteredPayload,
-          meta: {
-            regionCode: MADANAPALLE_REGION_CODE,
-            eventCode: normalizedEventCode,
-            dateCode: normalizedDateCode,
-            venueCode: venueCode || "",
-            upstream: baseUrl,
-            attempts,
-            summary: summarizePayload(filteredPayload),
-            generatedAt: new Date().toISOString()
-          }
+          meta
         };
       } catch (error) {
         lastError = error;
@@ -160,6 +232,16 @@ export async function fetchMadanapalleShowtimesPayload({
     if (round < SHOWTIME_API_RETRY_ROUNDS - 1) {
       await sleep(SHOWTIME_API_RETRY_DELAY_MS * (round + 1));
     }
+  }
+
+  const cached = readLastGoodPayload({
+    eventCode: normalizedEventCode,
+    dateCode: normalizedDateCode,
+    venueCode,
+    attempts
+  });
+  if (cached) {
+    return cached;
   }
 
   const error = lastError || new Error(`Unable to fetch showtime payload for ${normalizedEventCode}`);
