@@ -104,6 +104,15 @@ body::before {
   margin-top: 22px;
 }
 
+.date-selector-block {
+  display: grid;
+  gap: 10px;
+}
+
+.date-selector-block .selector-select__label {
+  margin: 0;
+}
+
 .date-strip {
   display: flex;
   gap: 12px;

@@ -14,34 +14,57 @@
     "state": "Andhra Pradesh"
   },
   "summary": {
-    "totalShows": 12,
-    "totalCapacity": 0,
-    "totalAvailable": 0,
-    "totalSold": 0,
-    "totalGross": 0,
-    "occupancyPercent": 0
+    "totalShows": 18,
+    "totalCapacity": 3120,
+    "totalAvailable": 3108,
+    "totalSold": 12,
+    "totalGross": 1200,
+    "occupancyPercent": 0.38
   },
   "movies": [
     {
-      "eventCode": "ET00030041",
-      "title": "Ganga",
-      "displayTitle": "Ganga (2015) - Telugu",
-      "language": "",
+      "eventCode": "ET00053894",
+      "title": "Ninnu Kori",
+      "displayTitle": "Ninnu Kori - Telugu",
+      "language": "Telugu",
       "format": "2D",
-      "censor": "UA",
+      "censor": "U",
       "genres": [
-        "Comedy",
-        "Horror",
-        "Suspense"
+        "Drama",
+        "Romantic"
       ],
-      "totalShows": 1,
-      "totalCapacity": 0,
-      "totalAvailable": 0,
-      "totalSold": 0,
-      "totalGross": 0,
-      "venueCodes": {},
+      "totalShows": 2,
+      "totalCapacity": 1040,
+      "totalAvailable": 1030,
+      "totalSold": 10,
+      "totalGross": 1000,
+      "venueCodes": [
+        "ASRM"
+      ],
       "venueCount": 1,
-      "occupancyPercent": 0
+      "occupancyPercent": 0.96
+    },
+    {
+      "eventCode": "ET00493107",
+      "title": "GaayaPadda Simham",
+      "displayTitle": "GaayaPadda Simham - Telugu",
+      "language": "Telugu",
+      "format": "2D",
+      "censor": "UA16",
+      "genres": [
+        "Action",
+        "Drama"
+      ],
+      "totalShows": 4,
+      "totalCapacity": 2080,
+      "totalAvailable": 2078,
+      "totalSold": 2,
+      "totalGross": 200,
+      "venueCodes": [
+        "ASRM"
+      ],
+      "venueCount": 1,
+      "occupancyPercent": 0.1
     },
     {
       "eventCode": "ET00380715",
@@ -61,7 +84,32 @@
       "totalAvailable": 0,
       "totalSold": 0,
       "totalGross": 0,
-      "venueCodes": {},
+      "venueCodes": [
+        "RTDM"
+      ],
+      "venueCount": 1,
+      "occupancyPercent": 0
+    },
+    {
+      "eventCode": "ET00030041",
+      "title": "Ganga",
+      "displayTitle": "Ganga (2015) - Telugu",
+      "language": "",
+      "format": "2D",
+      "censor": "UA",
+      "genres": [
+        "Comedy",
+        "Horror",
+        "Suspense"
+      ],
+      "totalShows": 1,
+      "totalCapacity": 0,
+      "totalAvailable": 0,
+      "totalSold": 0,
+      "totalGross": 0,
+      "venueCodes": [
+        "RTDM"
+      ],
       "venueCount": 1,
       "occupancyPercent": 0
     },
@@ -81,7 +129,9 @@
       "totalAvailable": 0,
       "totalSold": 0,
       "totalGross": 0,
-      "venueCodes": {},
+      "venueCodes": [
+        "MSDR"
+      ],
       "venueCount": 1,
       "occupancyPercent": 0
     },
@@ -103,12 +153,25 @@
       "totalAvailable": 0,
       "totalSold": 0,
       "totalGross": 0,
-      "venueCodes": {},
+      "venueCodes": [
+        "SKMD"
+      ],
       "venueCount": 1,
       "occupancyPercent": 0
     }
   ],
   "theatres": [
+    {
+      "venueCode": "ASRM",
+      "name": "ASR A/C 4K Laser Dolby Surround 7.1: Madanapalle",
+      "shortName": "ASR",
+      "totalShows": 6,
+      "totalCapacity": 3120,
+      "totalAvailable": 3108,
+      "totalSold": 12,
+      "totalGross": 1200,
+      "occupancyPercent": 0.38
+    },
     {
       "venueCode": "RTDM",
       "name": "Ravi A/C 4K Laser Dolby Surround 7.1: Madanapalle",
@@ -144,6 +207,69 @@
     }
   ],
   "shows": [
+    {
+      "id": "ASRM-8380",
+      "eventCode": "ET00493107",
+      "sessionId": "8380",
+      "venueCode": "ASRM",
+      "venueName": "ASR A/C 4K Laser Dolby Surround 7.1: Madanapalle",
+      "theatreShortName": "ASR",
+      "citySlug": "madanapalle",
+      "showDate": "2026-05-06",
+      "showDateCode": "20260506",
+      "showDateTime": "2026-05-06T05:30:00.000Z",
+      "showDateTimeCode": "202605061100",
+      "showTimeLabel": "11:00 AM",
+      "cutoffAt": "2026-05-06T05:45:00.000Z",
+      "cutoffCode": "202605061115",
+      "format": "2D",
+      "language": "Telugu",
+      "title": "GaayaPadda Simham - Telugu",
+      "releaseLabel": "GaayaPadda Simham",
+      "censor": "UA16",
+      "genres": [
+        "Action",
+        "Drama"
+      ],
+      "trailerUrl": "https://www.youtube.com/watch?v=j5W446fgx7A",
+      "screenName": "ASR",
+      "bookingUrl": "https://in.bookmyshow.com/cinemas/madanapalle/asr-a-c-4k-laser-dolby-surround-71-madanapalle/buytickets/ASRM/20260506",
+      "seatLayoutUrl": "https://in.bookmyshow.com/movies/madanapalle/seat-layout/ET00493107/ASRM/8380/20260506",
+      "categories": [
+        {
+          "name": "RESERVED",
+          "label": "RESERVED",
+          "price": 105,
+          "netPrice": 100,
+          "totalSeats": 386,
+          "availableSeats": 384,
+          "soldSeats": 2,
+          "unknownSeats": 0,
+          "rows": []
+        },
+        {
+          "name": "SECOND CLASS",
+          "label": "SECOND CLASS",
+          "price": 84,
+          "netPrice": 79,
+          "totalSeats": 134,
+          "availableSeats": 134,
+          "soldSeats": 0,
+          "unknownSeats": 0,
+          "rows": []
+        }
+      ],
+      "totalSeats": 520,
+      "availableSeats": 518,
+      "soldSeats": 2,
+      "unknownSeats": 0,
+      "gross": 200,
+      "occupancyPercent": 0.38,
+      "source": {
+        "method": "live-proxy-showtimes",
+        "capturedAt": "2026-05-06T03:54:55.120Z"
+      }
+    },
     {
       "id": "RTDM-16181",
       "eventCode": "ET00030041",
@@ -542,6 +668,69 @@
       }
     },
     {
+      "id": "ASRM-8381",
+      "eventCode": "ET00493107",
+      "sessionId": "8381",
+      "venueCode": "ASRM",
+      "venueName": "ASR A/C 4K Laser Dolby Surround 7.1: Madanapalle",
+      "theatreShortName": "ASR",
+      "citySlug": "madanapalle",
+      "showDate": "2026-05-06",
+      "showDateCode": "20260506",
+      "showDateTime": "2026-05-06T08:45:00.000Z",
+      "showDateTimeCode": "202605061415",
+      "showTimeLabel": "02:15 PM",
+      "cutoffAt": "2026-05-06T09:00:00.000Z",
+      "cutoffCode": "202605061430",
+      "format": "2D",
+      "language": "Telugu",
+      "title": "GaayaPadda Simham - Telugu",
+      "releaseLabel": "GaayaPadda Simham",
+      "censor": "UA16",
+      "genres": [
+        "Action",
+        "Drama"
+      ],
+      "trailerUrl": "https://www.youtube.com/watch?v=j5W446fgx7A",
+      "screenName": "ASR",
+      "bookingUrl": "https://in.bookmyshow.com/cinemas/madanapalle/asr-a-c-4k-laser-dolby-surround-71-madanapalle/buytickets/ASRM/20260506",
+      "seatLayoutUrl": "https://in.bookmyshow.com/movies/madanapalle/seat-layout/ET00493107/ASRM/8381/20260506",
+      "categories": [
+        {
+          "name": "RESERVED",
+          "label": "RESERVED",
+          "price": 105,
+          "netPrice": 100,
+          "totalSeats": 386,
+          "availableSeats": 386,
+          "soldSeats": 0,
+          "unknownSeats": 0,
+          "rows": []
+        },
+        {
+          "name": "SECOND CLASS",
+          "label": "SECOND CLASS",
+          "price": 84,
+          "netPrice": 79,
+          "totalSeats": 134,
+          "availableSeats": 134,
+          "soldSeats": 0,
+          "unknownSeats": 0,
+          "rows": []
+        }
+      ],
+      "totalSeats": 520,
+      "availableSeats": 520,
+      "soldSeats": 0,
+      "unknownSeats": 0,
+      "gross": 0,
+      "occupancyPercent": 0,
+      "source": {
+        "method": "live-proxy-showtimes",
+        "capturedAt": "2026-05-06T03:54:55.120Z"
+      }
+    },
+    {
       "id": "RTDM-16170",
       "eventCode": "ET00380715",
       "sessionId": "16170",
@@ -759,6 +948,69 @@
       "source": {
         "method": "bookmyshow-showtime-discovery",
         "capturedAt": "2026-05-05T14:33:50.043Z"
+      }
+    },
+    {
+      "id": "ASRM-8382",
+      "eventCode": "ET00493107",
+      "sessionId": "8382",
+      "venueCode": "ASRM",
+      "venueName": "ASR A/C 4K Laser Dolby Surround 7.1: Madanapalle",
+      "theatreShortName": "ASR",
+      "citySlug": "madanapalle",
+      "showDate": "2026-05-06",
+      "showDateCode": "20260506",
+      "showDateTime": "2026-05-06T12:30:00.000Z",
+      "showDateTimeCode": "202605061800",
+      "showTimeLabel": "06:00 PM",
+      "cutoffAt": "2026-05-06T12:45:00.000Z",
+      "cutoffCode": "202605061815",
+      "format": "2D",
+      "language": "Telugu",
+      "title": "GaayaPadda Simham - Telugu",
+      "releaseLabel": "GaayaPadda Simham",
+      "censor": "UA16",
+      "genres": [
+        "Action",
+        "Drama"
+      ],
+      "trailerUrl": "https://www.youtube.com/watch?v=j5W446fgx7A",
+      "screenName": "ASR",
+      "bookingUrl": "https://in.bookmyshow.com/cinemas/madanapalle/asr-a-c-4k-laser-dolby-surround-71-madanapalle/buytickets/ASRM/20260506",
+      "seatLayoutUrl": "https://in.bookmyshow.com/movies/madanapalle/seat-layout/ET00493107/ASRM/8382/20260506",
+      "categories": [
+        {
+          "name": "RESERVED",
+          "label": "RESERVED",
+          "price": 105,
+          "netPrice": 100,
+          "totalSeats": 386,
+          "availableSeats": 386,
+          "soldSeats": 0,
+          "unknownSeats": 0,
+          "rows": []
+        },
+        {
+          "name": "SECOND CLASS",
+          "label": "SECOND CLASS",
+          "price": 84,
+          "netPrice": 79,
+          "totalSeats": 134,
+          "availableSeats": 134,
+          "soldSeats": 0,
+          "unknownSeats": 0,
+          "rows": []
+        }
+      ],
+      "totalSeats": 520,
+      "availableSeats": 520,
+      "soldSeats": 0,
+      "unknownSeats": 0,
+      "gross": 0,
+      "occupancyPercent": 0,
+      "source": {
+        "method": "live-proxy-showtimes",
+        "capturedAt": "2026-05-06T03:54:55.120Z"
       }
     },
     {
@@ -1160,6 +1412,69 @@
       }
     },
     {
+      "id": "ASRM-8383",
+      "eventCode": "ET00493107",
+      "sessionId": "8383",
+      "venueCode": "ASRM",
+      "venueName": "ASR A/C 4K Laser Dolby Surround 7.1: Madanapalle",
+      "theatreShortName": "ASR",
+      "citySlug": "madanapalle",
+      "showDate": "2026-05-06",
+      "showDateCode": "20260506",
+      "showDateTime": "2026-05-06T15:45:00.000Z",
+      "showDateTimeCode": "202605062115",
+      "showTimeLabel": "09:15 PM",
+      "cutoffAt": "2026-05-06T16:00:00.000Z",
+      "cutoffCode": "202605062130",
+      "format": "2D",
+      "language": "Telugu",
+      "title": "GaayaPadda Simham - Telugu",
+      "releaseLabel": "GaayaPadda Simham",
+      "censor": "UA16",
+      "genres": [
+        "Action",
+        "Drama"
+      ],
+      "trailerUrl": "https://www.youtube.com/watch?v=j5W446fgx7A",
+      "screenName": "ASR",
+      "bookingUrl": "https://in.bookmyshow.com/cinemas/madanapalle/asr-a-c-4k-laser-dolby-surround-71-madanapalle/buytickets/ASRM/20260506",
+      "seatLayoutUrl": "https://in.bookmyshow.com/movies/madanapalle/seat-layout/ET00493107/ASRM/8383/20260506",
+      "categories": [
+        {
+          "name": "RESERVED",
+          "label": "RESERVED",
+          "price": 105,
+          "netPrice": 100,
+          "totalSeats": 386,
+          "availableSeats": 386,
+          "soldSeats": 0,
+          "unknownSeats": 0,
+          "rows": []
+        },
+        {
+          "name": "SECOND CLASS",
+          "label": "SECOND CLASS",
+          "price": 84,
+          "netPrice": 79,
+          "totalSeats": 134,
+          "availableSeats": 134,
+          "soldSeats": 0,
+          "unknownSeats": 0,
+          "rows": []
+        }
+      ],
+      "totalSeats": 520,
+      "availableSeats": 520,
+      "soldSeats": 0,
+      "unknownSeats": 0,
+      "gross": 0,
+      "occupancyPercent": 0,
+      "source": {
+        "method": "live-proxy-showtimes",
+        "capturedAt": "2026-05-06T03:54:55.120Z"
+      }
+    },
+    {
       "id": "RTDM-16172",
       "eventCode": "ET00380715",
       "sessionId": "16172",
@@ -1378,6 +1693,132 @@
         "method": "bookmyshow-showtime-discovery",
         "capturedAt": "2026-05-05T14:33:50.043Z"
       }
+    },
+    {
+      "id": "ASRM-8388",
+      "eventCode": "ET00053894",
+      "sessionId": "8388",
+      "venueCode": "ASRM",
+      "venueName": "ASR A/C 4K Laser Dolby Surround 7.1: Madanapalle",
+      "theatreShortName": "ASR",
+      "citySlug": "madanapalle",
+      "showDate": "2026-05-08",
+      "showDateCode": "20260508",
+      "showDateTime": "2026-05-08T02:00:00.000Z",
+      "showDateTimeCode": "202605080730",
+      "showTimeLabel": "07:30 AM",
+      "cutoffAt": "2026-05-08T02:15:00.000Z",
+      "cutoffCode": "202605080745",
+      "format": "2D",
+      "language": "Telugu",
+      "title": "Ninnu Kori - Telugu",
+      "releaseLabel": "Ninnu Kori",
+      "censor": "U",
+      "genres": [
+        "Drama",
+        "Romantic"
+      ],
+      "trailerUrl": "https://www.youtube.com/watch?v=Ia6EXfqKiV4",
+      "screenName": "ASR",
+      "bookingUrl": "https://in.bookmyshow.com/cinemas/madanapalle/asr-a-c-4k-laser-dolby-surround-71-madanapalle/buytickets/ASRM/20260508",
+      "seatLayoutUrl": "https://in.bookmyshow.com/movies/madanapalle/seat-layout/ET00053894/ASRM/8388/20260508",
+      "categories": [
+        {
+          "name": "RESERVED",
+          "label": "RESERVED",
+          "price": 105,
+          "netPrice": 100,
+          "totalSeats": 386,
+          "availableSeats": 376,
+          "soldSeats": 10,
+          "unknownSeats": 0,
+          "rows": []
+        },
+        {
+          "name": "SECOND CLASS",
+          "label": "SECOND CLASS",
+          "price": 84,
+          "netPrice": 79,
+          "totalSeats": 134,
+          "availableSeats": 134,
+          "soldSeats": 0,
+          "unknownSeats": 0,
+          "rows": []
+        }
+      ],
+      "totalSeats": 520,
+      "availableSeats": 510,
+      "soldSeats": 10,
+      "unknownSeats": 0,
+      "gross": 1000,
+      "occupancyPercent": 1.92,
+      "source": {
+        "method": "live-proxy-showtimes",
+        "capturedAt": "2026-05-06T03:54:55.121Z"
+      }
+    },
+    {
+      "id": "ASRM-8389",
+      "eventCode": "ET00053894",
+      "sessionId": "8389",
+      "venueCode": "ASRM",
+      "venueName": "ASR A/C 4K Laser Dolby Surround 7.1: Madanapalle",
+      "theatreShortName": "ASR",
+      "citySlug": "madanapalle",
+      "showDate": "2026-05-08",
+      "showDateCode": "20260508",
+      "showDateTime": "2026-05-08T05:30:00.000Z",
+      "showDateTimeCode": "202605081100",
+      "showTimeLabel": "11:00 AM",
+      "cutoffAt": "2026-05-08T05:45:00.000Z",
+      "cutoffCode": "202605081115",
+      "format": "2D",
+      "language": "Telugu",
+      "title": "Ninnu Kori - Telugu",
+      "releaseLabel": "Ninnu Kori",
+      "censor": "U",
+      "genres": [
+        "Drama",
+        "Romantic"
+      ],
+      "trailerUrl": "https://www.youtube.com/watch?v=Ia6EXfqKiV4",
+      "screenName": "ASR",
+      "bookingUrl": "https://in.bookmyshow.com/cinemas/madanapalle/asr-a-c-4k-laser-dolby-surround-71-madanapalle/buytickets/ASRM/20260508",
+      "seatLayoutUrl": "https://in.bookmyshow.com/movies/madanapalle/seat-layout/ET00053894/ASRM/8389/20260508",
+      "categories": [
+        {
+          "name": "RESERVED",
+          "label": "RESERVED",
+          "price": 105,
+          "netPrice": 100,
+          "totalSeats": 386,
+          "availableSeats": 386,
+          "soldSeats": 0,
+          "unknownSeats": 0,
+          "rows": []
+        },
+        {
+          "name": "SECOND CLASS",
+          "label": "SECOND CLASS",
+          "price": 84,
+          "netPrice": 79,
+          "totalSeats": 134,
+          "availableSeats": 134,
+          "soldSeats": 0,
+          "unknownSeats": 0,
+          "rows": []
+        }
+      ],
+      "totalSeats": 520,
+      "availableSeats": 520,
+      "soldSeats": 0,
+      "unknownSeats": 0,
+      "gross": 0,
+      "occupancyPercent": 0,
+      "source": {
+        "method": "live-proxy-showtimes",
+        "capturedAt": "2026-05-06T03:54:55.121Z"
+      }
     }
   ],
   "meta": {
@@ -1387,7 +1828,8 @@
       "Showtime API fallback failed for ET00030041: 500 Internal Server Error: {\"error\":\"Failed to parse JSON from response\",\"details\":\"Expected property name or '}' in JSON at position 1 (line 1 column 2)\"}",
       "Showtime API fallback failed for ET00380715: 500 Internal Server Error: {\"error\":\"Failed to parse JSON from response\",\"details\":\"Expected property name or '}' in JSON at position 1 (line 1 column 2)\"}",
       "Showtime API fallback failed for ET00496966: 500 Internal Server Error: {\"error\":\"Failed to parse JSON from response\",\"details\":\"Expected property name or '}' in JSON at position 1 (line 1 column 2)\"}",
-      "Showtime API fallback failed for ET00495359: 500 Internal Server Error: {\"error\":\"Failed to parse JSON from response\",\"details\":\"Expected property name or '}' in JSON at position 1 (line 1 column 2)\"}"
+      "Showtime API fallback failed for ET00495359: 500 Internal Server Error: {\"error\":\"Failed to parse JSON from response\",\"details\":\"Expected property name or '}' in JSON at position 1 (line 1 column 2)\"}",
+      "ASR May 6 shows were repaired from the Madanapalle live mirror payload."
     ]
   }
 }

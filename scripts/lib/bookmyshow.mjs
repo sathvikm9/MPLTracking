@@ -105,16 +105,26 @@ function hasAvailabilityMetrics(categories) {
   );
 }
 
+function netTicketPrice(price) {
+  return Math.max(toNumber(price) - 5, 0);
+}
+
 function buildSnapshotFromCategories(show, categories, method) {
   const totalSeats = categories.reduce((sum, category) => sum + category.totalSeats, 0);
   const availableSeats = categories.reduce((sum, category) => sum + category.availableSeats, 0);
   const soldSeats = categories.reduce((sum, category) => sum + category.soldSeats, 0);
   const unknownSeats = categories.reduce((sum, category) => sum + category.unknownSeats, 0);
-  const gross = categories.reduce((sum, category) => sum + category.soldSeats * category.price, 0);
+  const gross = categories.reduce(
+    (sum, category) => sum + category.soldSeats * netTicketPrice(category.price),
+    0
+  );
 
   return {
     ...show,
-    categories,
+    categories: categories.map((category) => ({
+      ...category,
+      netPrice: netTicketPrice(category.price)
+    })),
     totalSeats,
     availableSeats,
     soldSeats,
@@ -494,11 +504,17 @@ async function collectShowSnapshot(page, show) {
   const availableSeats = categories.reduce((sum, category) => sum + category.availableSeats, 0);
   const soldSeats = categories.reduce((sum, category) => sum + category.soldSeats, 0);
   const unknownSeats = categories.reduce((sum, category) => sum + category.unknownSeats, 0);
-  const gross = categories.reduce((sum, category) => sum + category.soldSeats * category.price, 0);
+  const gross = categories.reduce(
+    (sum, category) => sum + category.soldSeats * netTicketPrice(category.price),
+    0
+  );
 
   return {
     ...show,
-    categories,
+    categories: categories.map((category) => ({
+      ...category,
+      netPrice: netTicketPrice(category.price)
+    })),
     totalSeats,
     availableSeats,
     soldSeats,

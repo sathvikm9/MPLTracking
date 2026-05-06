@@ -43,6 +43,20 @@ function ticketLabel(value) {
   return `${number(count)} ticket${count === 1 ? "" : "s"}`;
 }
 
+function netTicketPrice(price) {
+  return Math.max(Number(price || 0) - 5, 0);
+}
+
+function showGross(show) {
+  const categories = Array.isArray(show.categories) ? show.categories : [];
+  if (!categories.length) return Number(show.gross || 0);
+
+  return categories.reduce(
+    (sum, category) => sum + Number(category.soldSeats || 0) * netTicketPrice(category.price),
+    0
+  );
+}
+
 async function fetchJson(url) {
   const response = await fetch(url, { cache: "no-store" });
   if (!response.ok) {
@@ -82,7 +96,7 @@ function buildSummaryFromShows(shows) {
   const totalCapacity = shows.reduce((sum, show) => sum + Number(show.totalSeats || 0), 0);
   const totalAvailable = shows.reduce((sum, show) => sum + Number(show.availableSeats || 0), 0);
   const totalSold = shows.reduce((sum, show) => sum + Number(show.soldSeats || 0), 0);
-  const totalGross = shows.reduce((sum, show) => sum + Number(show.gross || 0), 0);
+  const totalGross = shows.reduce((sum, show) => sum + showGross(show), 0);
 
   return {
     totalShows,
@@ -123,7 +137,7 @@ function summarizeMoviesFromShows(shows) {
     entry.totalCapacity += Number(show.totalSeats || 0);
     entry.totalAvailable += Number(show.availableSeats || 0);
     entry.totalSold += Number(show.soldSeats || 0);
-    entry.totalGross += Number(show.gross || 0);
+    entry.totalGross += showGross(show);
     entry.venueCodes.add(show.venueCode);
   }
 
@@ -160,7 +174,7 @@ function summarizeTheatresFromShows(shows) {
     entry.totalCapacity += Number(show.totalSeats || 0);
     entry.totalAvailable += Number(show.availableSeats || 0);
     entry.totalSold += Number(show.soldSeats || 0);
-    entry.totalGross += Number(show.gross || 0);
+    entry.totalGross += showGross(show);
   }
 
   return Array.from(map.values())
@@ -939,35 +953,6 @@ function App() {
           </p>
 
           <div className="selector-shell">
-            <div className="date-strip" aria-label="Date selection">
-              {datesLoading ? <div className="date-strip__empty">Loading booking dates...</div> : null}
-              {!datesLoading && datesError ? (
-                <div className="date-strip__empty">Could not load booking dates.</div>
-              ) : null}
-              {!datesLoading && !datesError && !dateOptions.length ? (
-                <div className="date-strip__empty">
-                  No booking dates found for {selectedTheatreLabel}.
-                </div>
-              ) : null}
-              {!datesLoading && !datesError
-                ? dateOptions.map((option) => (
-                    <button
-                      key={option.value}
-                      className={`date-chip${selectedDate === option.value ? " date-chip--active" : ""}`}
-                      onClick={() => setSelectedDate(option.value)}
-                      type="button"
-                    >
-                      <span className="date-chip__weekday">{option.weekday}</span>
-                      <strong className="date-chip__day">{option.day}</strong>
-                      <span className="date-chip__month">{option.month}</span>
-                      <span className="date-chip__shows">
-                        {number(showsForDateOption(option, selectedTheatre))} shows
-                      </span>
-                    </button>
-                  ))
-                : null}
-            </div>
-
             <label className="selector-select-shell">
               <span className="selector-select__label">Theatre</span>
               <select
@@ -982,6 +967,38 @@ function App() {
                 ))}
               </select>
             </label>
+
+            <div className="date-selector-block">
+              <p className="selector-select__label">Available booking dates</p>
+              <div className="date-strip" aria-label="Date selection">
+                {datesLoading ? <div className="date-strip__empty">Loading booking dates...</div> : null}
+                {!datesLoading && datesError ? (
+                  <div className="date-strip__empty">Could not load booking dates.</div>
+                ) : null}
+                {!datesLoading && !datesError && !dateOptions.length ? (
+                  <div className="date-strip__empty">
+                    No booking dates found for {selectedTheatreLabel}.
+                  </div>
+                ) : null}
+                {!datesLoading && !datesError
+                  ? dateOptions.map((option) => (
+                      <button
+                        key={option.value}
+                        className={`date-chip${selectedDate === option.value ? " date-chip--active" : ""}`}
+                        onClick={() => setSelectedDate(option.value)}
+                        type="button"
+                      >
+                        <span className="date-chip__weekday">{option.weekday}</span>
+                        <strong className="date-chip__day">{option.day}</strong>
+                        <span className="date-chip__month">{option.month}</span>
+                        <span className="date-chip__shows">
+                          {number(showsForDateOption(option, selectedTheatre))} shows
+                        </span>
+                      </button>
+                    ))
+                  : null}
+              </div>
+            </div>
           </div>
 
           {hasDiscoveryOnlyShows ? (
@@ -1195,7 +1212,7 @@ function App() {
             {
               key: "gross",
               label: "Gross",
-              render: (show) => currency(show.gross)
+              render: (show) => currency(showGross(show))
             }
           ]}
           rows={filteredShows}
