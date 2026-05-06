@@ -418,6 +418,14 @@ async function refreshLiveSnapshot(baseline, fetchImpl) {
         cachedEventCodes.push(eventCode);
       }
 
+      // Remove stale base shows for this event before applying live ones,
+      // so that shows removed from BookMyShow are dropped from the tracker.
+      for (const [id, show] of snapshotsById.entries()) {
+        if (show.eventCode === eventCode) {
+          snapshotsById.delete(id);
+        }
+      }
+
       for (const snapshot of buildApiSnapshotsFromPayload(payload, theatreMap, baseShowIndex)) {
         snapshotsById.set(snapshot.id, snapshot);
       }
