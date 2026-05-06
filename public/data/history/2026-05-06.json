@@ -14,36 +14,14 @@
     "state": "Andhra Pradesh"
   },
   "summary": {
-    "totalShows": 18,
-    "totalCapacity": 3120,
-    "totalAvailable": 3108,
-    "totalSold": 12,
-    "totalGross": 1200,
-    "occupancyPercent": 0.38
+    "totalShows": 16,
+    "totalCapacity": 2080,
+    "totalAvailable": 2078,
+    "totalSold": 2,
+    "totalGross": 200,
+    "occupancyPercent": 0.1
   },
   "movies": [
-    {
-      "eventCode": "ET00053894",
-      "title": "Ninnu Kori",
-      "displayTitle": "Ninnu Kori - Telugu",
-      "language": "Telugu",
-      "format": "2D",
-      "censor": "U",
-      "genres": [
-        "Drama",
-        "Romantic"
-      ],
-      "totalShows": 2,
-      "totalCapacity": 1040,
-      "totalAvailable": 1030,
-      "totalSold": 10,
-      "totalGross": 1000,
-      "venueCodes": [
-        "ASRM"
-      ],
-      "venueCount": 1,
-      "occupancyPercent": 0.96
-    },
     {
       "eventCode": "ET00493107",
       "title": "GaayaPadda Simham",
@@ -67,30 +45,6 @@
       "occupancyPercent": 0.1
     },
     {
-      "eventCode": "ET00380715",
-      "title": "Dacoit",
-      "displayTitle": "Dacoit - Telugu",
-      "language": "",
-      "format": "2D",
-      "censor": "UA13+",
-      "genres": [
-        "Action",
-        "Drama",
-        "Romantic",
-        "Thriller"
-      ],
-      "totalShows": 3,
-      "totalCapacity": 0,
-      "totalAvailable": 0,
-      "totalSold": 0,
-      "totalGross": 0,
-      "venueCodes": [
-        "RTDM"
-      ],
-      "venueCount": 1,
-      "occupancyPercent": 0
-    },
-    {
       "eventCode": "ET00030041",
       "title": "Ganga",
       "displayTitle": "Ganga (2015) - Telugu",
@@ -109,28 +63,6 @@
       "totalGross": 0,
       "venueCodes": [
         "RTDM"
-      ],
-      "venueCount": 1,
-      "occupancyPercent": 0
-    },
-    {
-      "eventCode": "ET00496966",
-      "title": "Kara",
-      "displayTitle": "Kara (Telugu) - Telugu",
-      "language": "",
-      "format": "2D",
-      "censor": "UA16+",
-      "genres": [
-        "Action",
-        "Thriller"
-      ],
-      "totalShows": 4,
-      "totalCapacity": 0,
-      "totalAvailable": 0,
-      "totalSold": 0,
-      "totalGross": 0,
-      "venueCodes": [
-        "MSDR"
       ],
       "venueCount": 1,
       "occupancyPercent": 0
@@ -158,6 +90,52 @@
       ],
       "venueCount": 1,
       "occupancyPercent": 0
+    },
+    {
+      "eventCode": "ET00496966",
+      "title": "Kara",
+      "displayTitle": "Kara (Telugu) - Telugu",
+      "language": "",
+      "format": "2D",
+      "censor": "UA16+",
+      "genres": [
+        "Action",
+        "Thriller"
+      ],
+      "totalShows": 4,
+      "totalCapacity": 0,
+      "totalAvailable": 0,
+      "totalSold": 0,
+      "totalGross": 0,
+      "venueCodes": [
+        "MSDR"
+      ],
+      "venueCount": 1,
+      "occupancyPercent": 0
+    },
+    {
+      "eventCode": "ET00380715",
+      "title": "Dacoit",
+      "displayTitle": "Dacoit - Telugu",
+      "language": "",
+      "format": "2D",
+      "censor": "UA13+",
+      "genres": [
+        "Action",
+        "Drama",
+        "Romantic",
+        "Thriller"
+      ],
+      "totalShows": 3,
+      "totalCapacity": 0,
+      "totalAvailable": 0,
+      "totalSold": 0,
+      "totalGross": 0,
+      "venueCodes": [
+        "RTDM"
+      ],
+      "venueCount": 1,
+      "occupancyPercent": 0
     }
   ],
   "theatres": [
@@ -165,12 +143,12 @@
       "venueCode": "ASRM",
       "name": "ASR A/C 4K Laser Dolby Surround 7.1: Madanapalle",
       "shortName": "ASR",
-      "totalShows": 6,
-      "totalCapacity": 3120,
-      "totalAvailable": 3108,
-      "totalSold": 12,
-      "totalGross": 1200,
-      "occupancyPercent": 0.38
+      "totalShows": 4,
+      "totalCapacity": 2080,
+      "totalAvailable": 2078,
+      "totalSold": 2,
+      "totalGross": 200,
+      "occupancyPercent": 0.1
     },
     {
       "venueCode": "RTDM",
@@ -184,9 +162,9 @@
       "occupancyPercent": 0
     },
     {
-      "venueCode": "MSDR",
-      "name": "Siddartha Cinemas:Screen 2 Dolby Laser,Madanapalle",
-      "shortName": "Siddartha",
+      "venueCode": "SKMD",
+      "name": "Sri Krishna A/C 4K Dolby Atmos: Madanapalle",
+      "shortName": "Sri Krishna",
       "totalShows": 4,
       "totalCapacity": 0,
       "totalAvailable": 0,
@@ -195,9 +173,9 @@
       "occupancyPercent": 0
     },
     {
-      "venueCode": "SKMD",
-      "name": "Sri Krishna A/C 4K Dolby Atmos: Madanapalle",
-      "shortName": "Sri Krishna",
+      "venueCode": "MSDR",
+      "name": "Siddartha Cinemas:Screen 2 Dolby Laser,Madanapalle",
+      "shortName": "Siddartha",
       "totalShows": 4,
       "totalCapacity": 0,
       "totalAvailable": 0,
@@ -1693,137 +1671,12 @@
         "method": "bookmyshow-showtime-discovery",
         "capturedAt": "2026-05-05T14:33:50.043Z"
       }
-    },
-    {
-      "id": "ASRM-8388",
-      "eventCode": "ET00053894",
-      "sessionId": "8388",
-      "venueCode": "ASRM",
-      "venueName": "ASR A/C 4K Laser Dolby Surround 7.1: Madanapalle",
-      "theatreShortName": "ASR",
-      "citySlug": "madanapalle",
-      "showDate": "2026-05-08",
-      "showDateCode": "20260508",
-      "showDateTime": "2026-05-08T02:00:00.000Z",
-      "showDateTimeCode": "202605080730",
-      "showTimeLabel": "07:30 AM",
-      "cutoffAt": "2026-05-08T02:15:00.000Z",
-      "cutoffCode": "202605080745",
-      "format": "2D",
-      "language": "Telugu",
-      "title": "Ninnu Kori - Telugu",
-      "releaseLabel": "Ninnu Kori",
-      "censor": "U",
-      "genres": [
-        "Drama",
-        "Romantic"
-      ],
-      "trailerUrl": "https://www.youtube.com/watch?v=Ia6EXfqKiV4",
-      "screenName": "ASR",
-      "bookingUrl": "https://in.bookmyshow.com/cinemas/madanapalle/asr-a-c-4k-laser-dolby-surround-71-madanapalle/buytickets/ASRM/20260508",
-      "seatLayoutUrl": "https://in.bookmyshow.com/movies/madanapalle/seat-layout/ET00053894/ASRM/8388/20260508",
-      "categories": [
-        {
-          "name": "RESERVED",
-          "label": "RESERVED",
-          "price": 105,
-          "netPrice": 100,
-          "totalSeats": 386,
-          "availableSeats": 376,
-          "soldSeats": 10,
-          "unknownSeats": 0,
-          "rows": []
-        },
-        {
-          "name": "SECOND CLASS",
-          "label": "SECOND CLASS",
-          "price": 84,
-          "netPrice": 79,
-          "totalSeats": 134,
-          "availableSeats": 134,
-          "soldSeats": 0,
-          "unknownSeats": 0,
-          "rows": []
-        }
-      ],
-      "totalSeats": 520,
-      "availableSeats": 510,
-      "soldSeats": 10,
-      "unknownSeats": 0,
-      "gross": 1000,
-      "occupancyPercent": 1.92,
-      "source": {
-        "method": "live-proxy-showtimes",
-        "capturedAt": "2026-05-06T03:54:55.121Z"
-      }
-    },
-    {
-      "id": "ASRM-8389",
-      "eventCode": "ET00053894",
-      "sessionId": "8389",
-      "venueCode": "ASRM",
-      "venueName": "ASR A/C 4K Laser Dolby Surround 7.1: Madanapalle",
-      "theatreShortName": "ASR",
-      "citySlug": "madanapalle",
-      "showDate": "2026-05-08",
-      "showDateCode": "20260508",
-      "showDateTime": "2026-05-08T05:30:00.000Z",
-      "showDateTimeCode": "202605081100",
-      "showTimeLabel": "11:00 AM",
-      "cutoffAt": "2026-05-08T05:45:00.000Z",
-      "cutoffCode": "202605081115",
-      "format": "2D",
-      "language": "Telugu",
-      "title": "Ninnu Kori - Telugu",
-      "releaseLabel": "Ninnu Kori",
-      "censor": "U",
-      "genres": [
-        "Drama",
-        "Romantic"
-      ],
-      "trailerUrl": "https://www.youtube.com/watch?v=Ia6EXfqKiV4",
-      "screenName": "ASR",
-      "bookingUrl": "https://in.bookmyshow.com/cinemas/madanapalle/asr-a-c-4k-laser-dolby-surround-71-madanapalle/buytickets/ASRM/20260508",
-      "seatLayoutUrl": "https://in.bookmyshow.com/movies/madanapalle/seat-layout/ET00053894/ASRM/8389/20260508",
-      "categories": [
-        {
-          "name": "RESERVED",
-          "label": "RESERVED",
-          "price": 105,
-          "netPrice": 100,
-          "totalSeats": 386,
-          "availableSeats": 386,
-          "soldSeats": 0,
-          "unknownSeats": 0,
-          "rows": []
-        },
-        {
-          "name": "SECOND CLASS",
-          "label": "SECOND CLASS",
-          "price": 84,
-          "netPrice": 79,
-          "totalSeats": 134,
-          "availableSeats": 134,
-          "soldSeats": 0,
-          "unknownSeats": 0,
-          "rows": []
-        }
-      ],
-      "totalSeats": 520,
-      "availableSeats": 520,
-      "soldSeats": 0,
-      "unknownSeats": 0,
-      "gross": 0,
-      "occupancyPercent": 0,
-      "source": {
-        "method": "live-proxy-showtimes",
-        "capturedAt": "2026-05-06T03:54:55.121Z"
-      }
     }
   ],
   "meta": {
     "status": "ok",
     "notes": [
+      "Corrected ASR May 6 to match the BookMyShow theatre page: removed stale Ninnu Kori sessions returned by an event-code mirror for a different date.",
       "Failed to discover shows for ASR: page.waitForFunction: Timeout 30000ms exceeded.",
       "Showtime API fallback failed for ET00030041: 500 Internal Server Error: {\"error\":\"Failed to parse JSON from response\",\"details\":\"Expected property name or '}' in JSON at position 1 (line 1 column 2)\"}",
       "Showtime API fallback failed for ET00380715: 500 Internal Server Error: {\"error\":\"Failed to parse JSON from response\",\"details\":\"Expected property name or '}' in JSON at position 1 (line 1 column 2)\"}",

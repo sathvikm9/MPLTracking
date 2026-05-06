@@ -1,6 +1,34 @@
 import { fetchMadanapalleShowtimesPayload } from "./madanapalle-showtimes.mjs";
 
 export const DEFAULT_SNAPSHOT_BASE_URL = "https://sathvikm9.github.io/MPLTracking/data";
+const DEFAULT_FUTURE_SCAN_DAYS = 9;
+const MAX_FUTURE_SCAN_DAYS = 21;
+const MADANAPALLE_THEATRES = [
+  {
+    venueCode: "ASRM",
+    shortName: "ASR",
+    name: "ASR A/C 4K Laser Dolby Surround 7.1: Madanapalle",
+    fallbackCutoffMinutes: 15
+  },
+  {
+    venueCode: "RTDM",
+    shortName: "Ravi",
+    name: "Ravi A/C 4K Laser Dolby Surround 7.1: Madanapalle",
+    fallbackCutoffMinutes: 15
+  },
+  {
+    venueCode: "MSDR",
+    shortName: "Siddartha",
+    name: "Siddartha Cinemas:Screen 2 Dolby Laser,Madanapalle",
+    fallbackCutoffMinutes: 30
+  },
+  {
+    venueCode: "SKMD",
+    shortName: "Sri Krishna",
+    name: "Sri Krishna A/C 4K Dolby Atmos: Madanapalle",
+    fallbackCutoffMinutes: 15
+  }
+];
 
 function toNumber(value) {
   if (typeof value === "number" && Number.isFinite(value)) return value;
@@ -9,6 +37,42 @@ function toNumber(value) {
   const cleaned = String(value).replace(/[^\d.-]/g, "");
   const parsed = Number(cleaned);
   return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function isoToDateCode(date) {
+  return String(date || "").replaceAll("-", "");
+}
+
+function dateCodeToIso(dateCode) {
+  const value = String(dateCode || "");
+  if (!/^\d{8}$/.test(value)) return "";
+  return `${value.slice(0, 4)}-${value.slice(4, 6)}-${value.slice(6, 8)}`;
+}
+
+function showDateTimeToIso(value) {
+  const code = String(value || "");
+  if (!/^\d{12}$/.test(code)) return "";
+  return `${code.slice(0, 4)}-${code.slice(4, 6)}-${code.slice(6, 8)}T${code.slice(
+    8,
+    10
+  )}:${code.slice(10, 12)}:00+05:30`;
+}
+
+function getIndiaTodayIso() {
+  const formatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Kolkata",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  });
+
+  return formatter.format(new Date());
+}
+
+function addDaysIso(dateIso, days) {
+  const [year, month, day] = String(dateIso).split("-").map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day + days));
+  return date.toISOString().slice(0, 10);
 }
 
 function normalizeMovieGenres(eventGenre) {
@@ -114,11 +178,15 @@ function buildTheatreMap(shows, theatres) {
   return showMap;
 }
 
-function buildApiSnapshotsFromPayload(payload, theatreMap, baseShowIndex) {
+function buildApiSnapshotsFromPayload(payload, theatreMap, baseShowIndex, targetDateCode = "") {
   const snapshots = [];
   const showDetails = Array.isArray(payload?.ShowDetails) ? payload.ShowDetails : [];
 
   for (const showDetail of showDetails) {
+    if (targetDateCode && showDetail?.Date && String(showDetail.Date) !== targetDateCode) {
+      continue;
+    }
+
     const childEvents = Array.isArray(showDetail?.Event?.ChildEvents) ? showDetail.Event.ChildEvents : [];
     const childEventsByCode = new Map(
       childEvents
@@ -133,6 +201,9 @@ function buildApiSnapshotsFromPayload(payload, theatreMap, baseShowIndex) {
 
       const showTimes = Array.isArray(venue?.ShowTimes) ? venue.ShowTimes : [];
       for (const showTime of showTimes) {
+        const showDateCode = String(showTime.ShowDateCode || showDetail.Date || "");
+        if (targetDateCode && showDateCode && showDateCode !== targetDateCode) continue;
+
         const baseShow = baseShowIndex.get(`${venue.VenueCode}-${showTime.SessionId}`);
         if (!baseShow) continue;
 
@@ -163,6 +234,80 @@ function buildApiSnapshotsFromPayload(payload, theatreMap, baseShowIndex) {
             },
             categories,
             "live-proxy-showtimes"
+          )
+        );
+      }
+    }
+  }
+
+  return snapshots;
+}
+
+function buildDiscoverySnapshotsFromPayload(payload, theatreMap, targetDateCode = "") {
+  const snapshots = [];
+  const showDetails = Array.isArray(payload?.ShowDetails) ? payload.ShowDetails : [];
+
+  for (const showDetail of showDetails) {
+    if (targetDateCode && showDetail?.Date && String(showDetail.Date) !== targetDateCode) continue;
+
+    const childEvents = Array.isArray(showDetail?.Event?.ChildEvents) ? showDetail.Event.ChildEvents : [];
+    const childEventsByCode = new Map(
+      childEvents
+        .filter((childEvent) => childEvent?.EventCode)
+        .map((childEvent) => [childEvent.EventCode, childEvent])
+    );
+    const venues = Array.isArray(showDetail?.Venues) ? showDetail.Venues : [];
+
+    for (const venue of venues) {
+      const theatre = theatreMap.get(venue?.VenueCode);
+      if (!theatre) continue;
+
+      const showTimes = Array.isArray(venue?.ShowTimes) ? venue.ShowTimes : [];
+      for (const showTime of showTimes) {
+        const showDateCode = String(showTime.ShowDateCode || showDetail.Date || "");
+        if (targetDateCode && showDateCode && showDateCode !== targetDateCode) continue;
+
+        const childEvent =
+          childEventsByCode.get(showTime.EventCode) || childEvents[0] || showDetail?.Event || {};
+        const categories = normalizeAvailabilityCategories(showTime.Categories);
+        const eventCode = showTime.EventCode || childEvent.EventCode || showDetail?.Event?.EventCode;
+
+        if (!eventCode || !showTime.SessionId || !hasAvailabilityMetrics(categories)) continue;
+
+        snapshots.push(
+          buildSnapshotFromCategories(
+            {
+              id: `${theatre.venueCode}-${showTime.SessionId}`,
+              eventCode,
+              sessionId: showTime.SessionId,
+              venueCode: theatre.venueCode,
+              venueName: theatre.name,
+              theatreShortName: theatre.shortName,
+              citySlug: "madanapalle",
+              showDate: dateCodeToIso(showDateCode),
+              showDateCode,
+              showDateTime: showDateTimeToIso(showTime.ShowDateTime),
+              showDateTimeCode: showTime.ShowDateTime,
+              showTimeLabel: showTime.ShowTime,
+              cutoffAt: showDateTimeToIso(showTime.CutOffDateTime),
+              cutoffCode: showTime.CutOffDateTime || null,
+              format: childEvent.EventDimension || "",
+              language: childEvent.EventLang || "",
+              title:
+                childEvent.EventName ||
+                childEvent.EventTitle ||
+                showDetail?.Event?.EventTitle ||
+                "Untitled Movie",
+              releaseLabel: showDetail?.Event?.EventTitle || childEvent.EventTitle || "",
+              censor: childEvent.EventCensor || "",
+              genres: normalizeMovieGenres(childEvent.EventGenre || showDetail?.Event?.EventGenre),
+              trailerUrl: childEvent.TrailerUrl || childEvent.EventTrailer || "",
+              screenName: showTime.ScreenName || theatre.shortName,
+              bookingUrl: "",
+              seatLayoutUrl: ""
+            },
+            categories,
+            "live-proxy-discovery"
           )
         );
       }
@@ -391,6 +536,140 @@ async function fetchBaselineSnapshot(fetchImpl, baseUrl, date) {
   return response.json();
 }
 
+async function fetchDateManifest(fetchImpl, baseUrl) {
+  const normalizedBaseUrl = String(baseUrl || DEFAULT_SNAPSHOT_BASE_URL).replace(/\/$/, "");
+  const response = await fetchImpl(`${normalizedBaseUrl}/dates.json?ts=${Date.now()}`, {
+    headers: {
+      accept: "application/json"
+    }
+  });
+
+  if (!response.ok) {
+    const error = new Error(`Failed to load date manifest: ${response.status}`);
+    error.status = response.status;
+    throw error;
+  }
+
+  return response.json();
+}
+
+function eventCodesFromManifest(manifest) {
+  const eventCodes = new Set();
+
+  for (const dateEntry of manifest?.dates || []) {
+    for (const movie of dateEntry.movies || []) {
+      if (movie?.eventCode) eventCodes.add(movie.eventCode);
+    }
+  }
+
+  return [...eventCodes].sort();
+}
+
+function buildDiscoveryBaseline(seedBaseline, targetDate) {
+  const targetDateCode = isoToDateCode(targetDate);
+
+  return {
+    ...(seedBaseline || {}),
+    version: seedBaseline?.version || 1,
+    generatedAt: new Date().toISOString(),
+    targetDate,
+    targetDateCode,
+    timezone: seedBaseline?.timezone || "Asia/Kolkata",
+    city: seedBaseline?.city || {
+      name: "Madanapalle",
+      regionCode: "MDNP",
+      timezone: "Asia/Kolkata"
+    },
+    shows: [],
+    theatres: MADANAPALLE_THEATRES,
+    meta: {
+      ...(seedBaseline?.meta || {}),
+      status: "ok"
+    }
+  };
+}
+
+async function discoverLiveShowsForDate({
+  fetchImpl,
+  snapshotBaseUrl,
+  targetDate,
+  venueCode = "",
+  seedBaseline = null,
+  retryRounds,
+  eventCodes: providedEventCodes = null
+}) {
+  const notes = [];
+  const targetDateCode = isoToDateCode(targetDate);
+  const theatreMap = new Map(MADANAPALLE_THEATRES.map((theatre) => [theatre.venueCode, theatre]));
+  const snapshotsById = new Map();
+  const successfulEventCodes = [];
+  const failedEventCodes = [];
+  const cachedEventCodes = [];
+  let eventCodes = Array.isArray(providedEventCodes) ? providedEventCodes : [];
+
+  if (!eventCodes.length) {
+    try {
+      eventCodes = eventCodesFromManifest(await fetchDateManifest(fetchImpl, snapshotBaseUrl));
+    } catch (error) {
+      notes.push(`Live discovery could not load event catalog: ${error.message}`);
+    }
+  }
+
+  if (!eventCodes.length && seedBaseline?.shows?.length) {
+    eventCodes = [...new Set(seedBaseline.shows.map((show) => show.eventCode).filter(Boolean))];
+  }
+
+  await Promise.all(eventCodes.map(async (eventCode) => {
+    try {
+      const { payload, meta } = await fetchMadanapalleShowtimesPayload({
+        eventCode,
+        dateCode: targetDateCode,
+        venueCode,
+        retryRounds,
+        fetchImpl
+      });
+
+      if (meta?.cache?.hit) cachedEventCodes.push(eventCode);
+
+      for (const snapshot of buildDiscoverySnapshotsFromPayload(payload, theatreMap, targetDateCode)) {
+        snapshotsById.set(snapshot.id, snapshot);
+      }
+
+      successfulEventCodes.push(eventCode);
+    } catch (error) {
+      failedEventCodes.push(eventCode);
+      notes.push(`Live discovery failed for ${eventCode}: ${error.message}`);
+    }
+  }));
+
+  const baseline = buildDiscoveryBaseline(seedBaseline, targetDate);
+  const output = buildOutputFromBaseline(baseline, Array.from(snapshotsById.values()), notes);
+  const liveShowCount = output.shows.filter(
+    (show) => show.source?.method === "live-proxy-discovery"
+  ).length;
+
+  return filterOutputByVenueCode(
+    {
+      ...output,
+      meta: {
+        ...(output.meta || {}),
+        liveDiscovery: true,
+        liveRefresh: {
+          attemptedEvents: eventCodes.length,
+          successfulEvents: successfulEventCodes.length,
+          failedEvents: failedEventCodes.length,
+          failedEventCodes,
+          cachedEvents: cachedEventCodes.length,
+          cachedEventCodes,
+          liveShowCount,
+          fallbackShowCount: output.shows.length - liveShowCount
+        }
+      }
+    },
+    venueCode
+  );
+}
+
 async function refreshLiveSnapshot(baseline, fetchImpl) {
   const notes = [];
   const baseShows = Array.isArray(baseline?.shows) ? baseline.shows : [];
@@ -426,7 +705,12 @@ async function refreshLiveSnapshot(baseline, fetchImpl) {
         }
       }
 
-      for (const snapshot of buildApiSnapshotsFromPayload(payload, theatreMap, baseShowIndex)) {
+      for (const snapshot of buildApiSnapshotsFromPayload(
+        payload,
+        theatreMap,
+        baseShowIndex,
+        baseline.targetDateCode
+      )) {
         snapshotsById.set(snapshot.id, snapshot);
       }
 
@@ -478,10 +762,20 @@ export async function buildLiveSnapshot({
     }
 
     const latestBaseline = await fetchBaselineSnapshot(fetchImpl, snapshotBaseUrl, "today");
+    const discovered = await discoverLiveShowsForDate({
+      fetchImpl,
+      snapshotBaseUrl,
+      targetDate: date,
+      venueCode,
+      seedBaseline: latestBaseline
+    });
+
+    if (discovered.shows.length) return discovered;
+
     return filterOutputByVenueCode(
       buildEmptyOutputFromBaseline(latestBaseline, date, [
         `No published baseline was found for ${date}.`,
-        "No shows were found for the selected date."
+        "Live discovery found no BookMyShow shows for the selected date."
       ]),
       venueCode
     );
@@ -489,6 +783,127 @@ export async function buildLiveSnapshot({
 
   const scopedBaseline = filterBaselineByVenueCode(baseline, venueCode);
   return filterOutputByVenueCode(await refreshLiveSnapshot(scopedBaseline, fetchImpl), venueCode);
+}
+
+function summarizeShowsByTheatre(shows) {
+  const map = new Map();
+
+  for (const show of shows) {
+    if (!show?.venueCode) continue;
+
+    if (!map.has(show.venueCode)) {
+      map.set(show.venueCode, {
+        venueCode: show.venueCode,
+        name: show.venueName || "",
+        shortName: show.theatreShortName || show.venueCode,
+        totalShows: 0
+      });
+    }
+
+    map.get(show.venueCode).totalShows += 1;
+  }
+
+  return Array.from(map.values()).sort((left, right) =>
+    String(left.shortName).localeCompare(String(right.shortName))
+  );
+}
+
+function summarizeShowsByMovie(shows) {
+  const map = new Map();
+
+  for (const show of shows) {
+    if (!show?.eventCode) continue;
+
+    if (!map.has(show.eventCode)) {
+      map.set(show.eventCode, {
+        eventCode: show.eventCode,
+        title: show.releaseLabel || show.title || "Unknown Movie",
+        language: show.language || "",
+        format: show.format || "",
+        totalShows: 0
+      });
+    }
+
+    map.get(show.eventCode).totalShows += 1;
+  }
+
+  return Array.from(map.values()).sort((left, right) =>
+    String(left.title).localeCompare(String(right.title))
+  );
+}
+
+function buildDateManifestEntry(output) {
+  const shows = Array.isArray(output?.shows) ? output.shows : [];
+  const theatres = summarizeShowsByTheatre(shows);
+
+  return {
+    date: output.targetDate,
+    dateCode: output.targetDateCode || isoToDateCode(output.targetDate),
+    generatedAt: output.generatedAt || "",
+    totalShows: shows.length,
+    theatres,
+    theatreCounts: Object.fromEntries(
+      theatres.map((theatre) => [
+        theatre.venueCode,
+        {
+          totalShows: theatre.totalShows,
+          shortName: theatre.shortName,
+          name: theatre.name
+        }
+      ])
+    ),
+    movies: summarizeShowsByMovie(shows)
+  };
+}
+
+export async function buildLiveDateManifest({
+  requestUrl,
+  snapshotBaseUrl = DEFAULT_SNAPSHOT_BASE_URL,
+  fetchImpl = fetch
+}) {
+  const url = new URL(requestUrl);
+  const venueCode = url.searchParams.get("venueCode") || "";
+  const days = Math.min(
+    Math.max(Number(url.searchParams.get("days") || DEFAULT_FUTURE_SCAN_DAYS), 1),
+    MAX_FUTURE_SCAN_DAYS
+  );
+  const today = getIndiaTodayIso();
+  const latestBaseline = await fetchBaselineSnapshot(fetchImpl, snapshotBaseUrl, "today").catch(
+    () => null
+  );
+  const eventCodes = await fetchDateManifest(fetchImpl, snapshotBaseUrl)
+    .then(eventCodesFromManifest)
+    .catch(() =>
+      latestBaseline?.shows?.length
+        ? [...new Set(latestBaseline.shows.map((show) => show.eventCode).filter(Boolean))]
+        : []
+    );
+  const dates = [];
+
+  for (let offset = 0; offset < days; offset += 1) {
+    const targetDate = addDaysIso(today, offset);
+      const output = await discoverLiveShowsForDate({
+        fetchImpl,
+        snapshotBaseUrl,
+      targetDate,
+      venueCode,
+      seedBaseline: latestBaseline,
+      retryRounds: 1,
+      eventCodes
+    });
+
+    if (output.shows.length) {
+      dates.push(buildDateManifestEntry(output));
+    }
+  }
+
+  return {
+    version: 1,
+    generatedAt: new Date().toISOString(),
+    liveDiscovery: true,
+    venueCode,
+    dates
+  };
 }
 
 export function buildHealthPayload() {

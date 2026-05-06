@@ -499,7 +499,27 @@ function useDateAvailability(selectedTheatre) {
   React.useEffect(() => {
     let active = true;
 
-    fetchJson(`./data/dates.json?ts=${Date.now()}`)
+    loadRuntimeConfig()
+      .then(async (config) => {
+        const liveApiBase = normalizeLiveApiBase(config);
+        if (!liveApiBase) {
+          return fetchJson(`./data/dates.json?ts=${Date.now()}`);
+        }
+
+        try {
+          const liveDatesUrl = new URL(`${liveApiBase}/api/live-dates`);
+          liveDatesUrl.searchParams.set("days", "9");
+          liveDatesUrl.searchParams.set("ts", String(Date.now()));
+
+          if (selectedTheatre !== "ALL") {
+            liveDatesUrl.searchParams.set("venueCode", selectedTheatre);
+          }
+
+          return await fetchJson(liveDatesUrl.toString());
+        } catch {
+          return fetchJson(`./data/dates.json?ts=${Date.now()}`);
+        }
+      })
       .then((manifest) => {
         if (!active) return;
 

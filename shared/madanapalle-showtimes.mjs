@@ -47,15 +47,37 @@ function assertValidMirrorParams({ eventCode, dateCode }) {
   }
 }
 
-function filterPayloadByVenueCode(payload, venueCode) {
-  if (!venueCode) return payload;
+function filterPayload(payload, { venueCode = "", dateCode = "" } = {}) {
+  const normalizedDateCode = normalizeDateCode(dateCode);
 
   return {
     ...payload,
-    ShowDetails: (payload.ShowDetails || []).map((showDetail) => ({
-      ...showDetail,
-      Venues: (showDetail.Venues || []).filter((venue) => venue.VenueCode === venueCode)
-    }))
+    ShowDetails: (payload.ShowDetails || [])
+      .map((showDetail) => {
+        const detailDateCode = normalizeDateCode(showDetail.Date);
+        if (normalizedDateCode && detailDateCode && detailDateCode !== normalizedDateCode) {
+          return null;
+        }
+
+        const venues = (showDetail.Venues || [])
+          .filter((venue) => !venueCode || venue.VenueCode === venueCode)
+          .map((venue) => ({
+            ...venue,
+            ShowTimes: (venue.ShowTimes || []).filter((showTime) => {
+              const showDateCode = normalizeDateCode(showTime.ShowDateCode || showDetail.Date);
+              return !normalizedDateCode || !showDateCode || showDateCode === normalizedDateCode;
+            })
+          }))
+          .filter((venue) => (venue.ShowTimes || []).length > 0);
+
+        if (!venues.length) return null;
+
+        return {
+          ...showDetail,
+          Venues: venues
+        };
+      })
+      .filter(Boolean)
   };
 }
 
@@ -101,7 +123,7 @@ function readLastGoodPayload({ eventCode, dateCode, venueCode, attempts }) {
     return null;
   }
 
-  const payload = filterPayloadByVenueCode(cloneJson(cached.payload), venueCode);
+  const payload = filterPayload(cloneJson(cached.payload), { venueCode, dateCode });
   return {
     payload,
     meta: {
@@ -141,6 +163,7 @@ export async function fetchMadanapalleShowtimesPayload({
   date,
   dateCode,
   venueCode = "",
+  retryRounds = SHOWTIME_API_RETRY_ROUNDS,
   fetchImpl = fetch
 }) {
   const normalizedEventCode = String(eventCode || "").trim().toUpperCase();
@@ -153,7 +176,9 @@ export async function fetchMadanapalleShowtimesPayload({
     dateCode: normalizedDateCode
   });
 
-  for (let round = 0; round < SHOWTIME_API_RETRY_ROUNDS; round += 1) {
+  const totalRetryRounds = Math.max(Number(retryRounds || 1), 1);
+
+  for (let round = 0; round < totalRetryRounds; round += 1) {
     for (const baseUrl of SHOWTIME_API_BASE_URLS) {
       const startedAt = Date.now();
 
@@ -187,7 +212,10 @@ export async function fetchMadanapalleShowtimesPayload({
         }
 
         const fullPayload = cloneJson(payload);
-        const filteredPayload = filterPayloadByVenueCode(payload, venueCode);
+        const filteredPayload = filterPayload(payload, {
+          venueCode,
+          dateCode: normalizedDateCode
+        });
         const meta = {
           regionCode: MADANAPALLE_REGION_CODE,
           eventCode: normalizedEventCode,
@@ -229,7 +257,7 @@ export async function fetchMadanapalleShowtimesPayload({
       }
     }
 
-    if (round < SHOWTIME_API_RETRY_ROUNDS - 1) {
+    if (round < totalRetryRounds - 1) {
       await sleep(SHOWTIME_API_RETRY_DELAY_MS * (round + 1));
     }
   }

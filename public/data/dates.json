@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-05-06T03:55:26.253Z",
+  "generatedAt": "2026-05-06T14:06:53.264Z",
   "dates": [
     {
       "date": "2026-05-05",
@@ -97,13 +97,13 @@
       "date": "2026-05-06",
       "dateCode": "20260506",
       "generatedAt": "2026-05-05T14:33:52.797Z",
-      "totalShows": 18,
+      "totalShows": 16,
       "theatres": [
         {
           "venueCode": "ASRM",
           "name": "ASR A/C 4K Laser Dolby Surround 7.1: Madanapalle",
           "shortName": "ASR",
-          "totalShows": 6
+          "totalShows": 4
         },
         {
           "venueCode": "RTDM",
@@ -126,7 +126,7 @@
       ],
       "theatreCounts": {
         "ASRM": {
-          "totalShows": 6,
+          "totalShows": 4,
           "shortName": "ASR",
           "name": "ASR A/C 4K Laser Dolby Surround 7.1: Madanapalle"
         },
@@ -174,13 +174,6 @@
           "language": "",
           "format": "2D",
           "totalShows": 4
-        },
-        {
-          "eventCode": "ET00053894",
-          "title": "Ninnu Kori",
-          "language": "Telugu",
-          "format": "2D",
-          "totalShows": 2
         },
         {
           "eventCode": "ET00495359",
