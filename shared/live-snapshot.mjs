@@ -1,20 +1,4 @@
-const SHOWTIME_API_BASE_URLS = [
-  "https://bms-india2.vercel.app/api/showtimes",
-  "https://bms-india3.vercel.app/api/showtimes",
-  "https://bms-india.vercel.app/api/showtimes"
-];
-const SHOWTIME_API_RETRY_ROUNDS = 3;
-const SHOWTIME_API_RETRY_DELAY_MS = 700;
-
-const SHOWTIME_API_HEADERS = {
-  accept: "application/json, text/plain, */*",
-  "cache-control": "no-cache",
-  origin: "https://boxoffice24.pages.dev",
-  pragma: "no-cache",
-  referer: "https://boxoffice24.pages.dev/",
-  "user-agent":
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36"
-};
+import { fetchMadanapalleShowtimesPayload } from "./madanapalle-showtimes.mjs";
 
 export const DEFAULT_SNAPSHOT_BASE_URL = "https://sathvikm9.github.io/MPLTracking/data";
 
@@ -25,10 +9,6 @@ function toNumber(value) {
   const cleaned = String(value).replace(/[^\d.-]/g, "");
   const parsed = Number(cleaned);
   return Number.isFinite(parsed) ? parsed : 0;
-}
-
-function sleep(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 function normalizeMovieGenres(eventGenre) {
@@ -90,47 +70,6 @@ function buildSnapshotFromCategories(show, categories, method) {
       capturedAt: new Date().toISOString()
     }
   };
-}
-
-async function fetchShowtimeApiPayload(eventCode, regionCode, dateCode, fetchImpl) {
-  let lastError = null;
-
-  for (let round = 0; round < SHOWTIME_API_RETRY_ROUNDS; round += 1) {
-    for (const baseUrl of SHOWTIME_API_BASE_URLS) {
-      try {
-        const url = new URL(baseUrl);
-        url.searchParams.set("eventCode", eventCode);
-        url.searchParams.set("regionCode", regionCode);
-        url.searchParams.set("dateCode", dateCode);
-        url.searchParams.set("_", `${Date.now()}-${round}`);
-
-        const response = await fetchImpl(url, {
-          cache: "no-store",
-          headers: SHOWTIME_API_HEADERS
-        });
-        const payload = await response.text();
-
-        if (!response.ok) {
-          throw new Error(`${response.status} ${response.statusText}: ${payload.slice(0, 200)}`);
-        }
-
-        const parsed = JSON.parse(payload);
-        if (!Array.isArray(parsed?.ShowDetails)) {
-          throw new Error("Missing ShowDetails in showtime payload");
-        }
-
-        return parsed;
-      } catch (error) {
-        lastError = error;
-      }
-    }
-
-    if (round < SHOWTIME_API_RETRY_ROUNDS - 1) {
-      await sleep(SHOWTIME_API_RETRY_DELAY_MS * (round + 1));
-    }
-  }
-
-  throw lastError || new Error(`Unable to fetch showtime payload for ${eventCode}`);
 }
 
 function buildShowIndex(shows) {
@@ -448,12 +387,11 @@ async function refreshLiveSnapshot(baseline, fetchImpl) {
   const uniqueEventCodes = [...new Set(baseShows.map((show) => show.eventCode).filter(Boolean))];
   for (const eventCode of uniqueEventCodes) {
     try {
-      const payload = await fetchShowtimeApiPayload(
+      const { payload } = await fetchMadanapalleShowtimesPayload({
         eventCode,
-        baseline.city.regionCode,
-        baseline.targetDateCode,
+        dateCode: baseline.targetDateCode,
         fetchImpl
-      );
+      });
 
       for (const snapshot of buildApiSnapshotsFromPayload(payload, theatreMap, baseShowIndex)) {
         snapshotsById.set(snapshot.id, snapshot);

@@ -5,6 +5,7 @@ import "./styles.css";
 
 const INDIA_TIMEZONE = "Asia/Kolkata";
 const DATE_WINDOW_DAYS = 5;
+const DATE_WINDOW_PAST_DAYS = 1;
 const CITY_INFO = {
   name: "Madanapalle",
   regionCode: "MDNP",
@@ -200,14 +201,6 @@ function getIndiaTodayIso() {
   }).format(new Date());
 }
 
-function getLocalTodayIso() {
-  const date = new Date();
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
-
 function addDaysToIsoDate(isoDate, days) {
   const [year, month, day] = isoDate.split("-").map(Number);
   const date = new Date(Date.UTC(year, month - 1, day));
@@ -244,11 +237,16 @@ function formatSelectedDateLabel(isoDate) {
   }).format(date);
 }
 
+function isPastIndiaDate(isoDate) {
+  return isoDate < getIndiaTodayIso();
+}
+
 function buildDateOptions() {
-  const today = getLocalTodayIso();
+  const today = getIndiaTodayIso();
+  const firstDate = addDaysToIsoDate(today, -DATE_WINDOW_PAST_DAYS);
 
   return Array.from({ length: DATE_WINDOW_DAYS }, (_, index) => {
-    const isoDate = addDaysToIsoDate(today, index);
+    const isoDate = addDaysToIsoDate(firstDate, index);
     return {
       value: isoDate,
       ...formatDateButtonParts(isoDate)
@@ -261,8 +259,10 @@ function isSupportedDate(isoDate, dateOptions) {
 }
 
 function getInitialSelectedDate(dateOptions) {
+  const indiaToday = getIndiaTodayIso();
+
   if (typeof window === "undefined") {
-    return dateOptions[0]?.value || getLocalTodayIso();
+    return dateOptions.find((option) => option.value === indiaToday)?.value || dateOptions[0]?.value || indiaToday;
   }
 
   const urlDate = new URLSearchParams(window.location.search).get("date");
@@ -270,7 +270,7 @@ function getInitialSelectedDate(dateOptions) {
     return urlDate;
   }
 
-  return dateOptions[0]?.value || getLocalTodayIso();
+  return dateOptions.find((option) => option.value === indiaToday)?.value || dateOptions[0]?.value || indiaToday;
 }
 
 function getInitialSelectedTheatre() {
@@ -407,10 +407,10 @@ function useDashboardData(selectedDate, selectedTheatre) {
   const loadDashboard = React.useCallback(async () => {
     const config = await loadRuntimeConfig();
     const liveApiBase = normalizeLiveApiBase(config);
-    const localToday = getLocalTodayIso();
+    const indiaToday = getIndiaTodayIso();
     const proxyDateParam = selectedDate;
     const staticPath =
-      selectedDate === localToday
+      selectedDate === indiaToday
         ? `./data/latest.json?ts=${Date.now()}`
         : `./data/history/${selectedDate}.json?ts=${Date.now()}`;
 
@@ -764,7 +764,9 @@ function App() {
     isLiveProxy && hasDiscoveryOnlyShows && Number(liveRefresh?.failedEvents || 0) > 0;
   const discoveryOnlyMessage = liveRetryFailed
     ? "Live BookMyShow count retry failed for this selection, so showtimes are being shown without seat counts. Click Refresh live data to try the live mirrors again."
-    : "Showtimes are available for this date, but BookMyShow has not exposed live seat counts through the category payload yet.";
+    : isPastIndiaDate(selectedDate)
+      ? "This is now a past BookMyShow India date, so live seat counts are no longer exposed. The page is showing the saved snapshot/showtimes for that date."
+      : "Showtimes are available for this date, but BookMyShow has not exposed live seat counts through the category payload yet.";
   const emptyMessage =
     selectedTheatre === "ALL"
       ? `No shows found for ${formatSelectedDateLabel(selectedDate)}.`
