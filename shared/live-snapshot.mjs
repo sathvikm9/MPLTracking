@@ -352,6 +352,16 @@ function filterOutputByVenueCode(output, venueCode) {
   };
 }
 
+function filterBaselineByVenueCode(baseline, venueCode) {
+  if (!venueCode) return baseline;
+
+  return {
+    ...baseline,
+    shows: (baseline.shows || []).filter((show) => show.venueCode === venueCode),
+    theatres: (baseline.theatres || []).filter((theatre) => theatre.venueCode === venueCode)
+  };
+}
+
 async function fetchBaselineSnapshot(fetchImpl, baseUrl, date) {
   const normalizedBaseUrl = String(baseUrl || DEFAULT_SNAPSHOT_BASE_URL).replace(/\/$/, "");
   const fileName = date && date !== "today" ? `history/${date}.json` : "latest.json";
@@ -452,7 +462,8 @@ export async function buildLiveSnapshot({
     );
   }
 
-  return filterOutputByVenueCode(await refreshLiveSnapshot(baseline, fetchImpl), venueCode);
+  const scopedBaseline = filterBaselineByVenueCode(baseline, venueCode);
+  return filterOutputByVenueCode(await refreshLiveSnapshot(scopedBaseline, fetchImpl), venueCode);
 }
 
 export function buildHealthPayload() {
