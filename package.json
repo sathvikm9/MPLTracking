@@ -5,9 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "npm run build:dates && vite build",
     "build:pages": "npm run collect && npm run build",
     "preview": "vite preview",
+    "build:dates": "node scripts/build-date-manifest.mjs",
     "collect": "node scripts/collect.mjs",
     "collect:tomorrow": "node scripts/collect.mjs --tomorrow",
     "collect:today": "node scripts/collect.mjs --today",

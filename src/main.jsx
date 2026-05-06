@@ -4,8 +4,6 @@ import ReactDOM from "react-dom/client";
 import "./styles.css";
 
 const INDIA_TIMEZONE = "Asia/Kolkata";
-const DATE_WINDOW_DAYS = 5;
-const DATE_WINDOW_PAST_DAYS = 1;
 const LAST_GOOD_DASHBOARD_CACHE_PREFIX = "mpltracking:last-good-live";
 const LAST_GOOD_DASHBOARD_CACHE_MAX_AGE_MS = 1000 * 60 * 60 * 6;
 const CITY_INFO = {
@@ -203,13 +201,6 @@ function getIndiaTodayIso() {
   }).format(new Date());
 }
 
-function addDaysToIsoDate(isoDate, days) {
-  const [year, month, day] = isoDate.split("-").map(Number);
-  const date = new Date(Date.UTC(year, month - 1, day));
-  date.setUTCDate(date.getUTCDate() + days);
-  return date.toISOString().slice(0, 10);
-}
-
 function formatDateButtonParts(isoDate) {
   const date = new Date(`${isoDate}T00:00:00+05:30`);
   return {
@@ -243,36 +234,47 @@ function isPastIndiaDate(isoDate) {
   return isoDate < getIndiaTodayIso();
 }
 
-function buildDateOptions() {
-  const today = getIndiaTodayIso();
-  const firstDate = addDaysToIsoDate(today, -DATE_WINDOW_PAST_DAYS);
+function buildDateOption(entry) {
+  const isoDate = entry.date || entry.value;
+  return {
+    value: isoDate,
+    totalShows: Number(entry.totalShows || 0),
+    theatres: entry.theatres || [],
+    theatreCounts: entry.theatreCounts || {},
+    movies: entry.movies || [],
+    ...formatDateButtonParts(isoDate)
+  };
+}
 
-  return Array.from({ length: DATE_WINDOW_DAYS }, (_, index) => {
-    const isoDate = addDaysToIsoDate(firstDate, index);
-    return {
-      value: isoDate,
-      ...formatDateButtonParts(isoDate)
-    };
-  });
+function dateHasShowsForTheatre(entry, selectedTheatre) {
+  if (selectedTheatre === "ALL") return Number(entry.totalShows || 0) > 0;
+  return Number(entry.theatreCounts?.[selectedTheatre]?.totalShows || 0) > 0;
+}
+
+function showsForDateOption(option, selectedTheatre) {
+  if (selectedTheatre === "ALL") return Number(option.totalShows || 0);
+  return Number(option.theatreCounts?.[selectedTheatre]?.totalShows || 0);
+}
+
+function pickPreferredDate(dateOptions) {
+  if (!dateOptions.length) return getIndiaTodayIso();
+
+  const today = getIndiaTodayIso();
+  return (
+    dateOptions.find((option) => option.value >= today)?.value ||
+    dateOptions[dateOptions.length - 1].value
+  );
 }
 
 function isSupportedDate(isoDate, dateOptions) {
   return dateOptions.some((option) => option.value === isoDate);
 }
 
-function getInitialSelectedDate(dateOptions) {
-  const indiaToday = getIndiaTodayIso();
-
-  if (typeof window === "undefined") {
-    return dateOptions.find((option) => option.value === indiaToday)?.value || dateOptions[0]?.value || indiaToday;
-  }
+function getInitialSelectedDate() {
+  if (typeof window === "undefined") return getIndiaTodayIso();
 
   const urlDate = new URLSearchParams(window.location.search).get("date");
-  if (urlDate && isSupportedDate(urlDate, dateOptions)) {
-    return urlDate;
-  }
-
-  return dateOptions.find((option) => option.value === indiaToday)?.value || dateOptions[0]?.value || indiaToday;
+  return /^\d{4}-\d{2}-\d{2}$/.test(urlDate || "") ? urlDate : getIndiaTodayIso();
 }
 
 function getInitialSelectedTheatre() {
@@ -465,6 +467,52 @@ function writeLastGoodDashboard(selectedDate, selectedTheatre, data) {
   } catch {
     // Cache is best-effort; live rendering should never fail because storage is unavailable.
   }
+}
+
+function useDateAvailability(selectedTheatre) {
+  const [state, setState] = React.useState({
+    loading: true,
+    error: null,
+    dateOptions: [],
+    allDates: []
+  });
+
+  React.useEffect(() => {
+    let active = true;
+
+    fetchJson(`./data/dates.json?ts=${Date.now()}`)
+      .then((manifest) => {
+        if (!active) return;
+
+        const allDates = (manifest.dates || []).map(buildDateOption);
+        const dateOptions = allDates.filter((entry) =>
+          dateHasShowsForTheatre(entry, selectedTheatre)
+        );
+
+        setState({
+          loading: false,
+          error: null,
+          dateOptions,
+          allDates
+        });
+      })
+      .catch((error) => {
+        if (!active) return;
+
+        setState({
+          loading: false,
+          error,
+          dateOptions: [],
+          allDates: []
+        });
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [selectedTheatre]);
+
+  return state;
 }
 
 function useDashboardData(selectedDate, selectedTheatre) {
@@ -786,13 +834,24 @@ function MovieWiseBoard({ shows, emptyMessage }) {
 }
 
 function App() {
-  const dateOptions = buildDateOptions();
-  const [selectedDate, setSelectedDate] = React.useState(() => getInitialSelectedDate(dateOptions));
+  const [selectedDate, setSelectedDate] = React.useState(getInitialSelectedDate);
   const [selectedTheatre, setSelectedTheatre] = React.useState(getInitialSelectedTheatre);
+  const {
+    loading: datesLoading,
+    error: datesError,
+    dateOptions
+  } = useDateAvailability(selectedTheatre);
   const { loading, error, data, refreshing, refresh } = useDashboardData(
     selectedDate,
     selectedTheatre
   );
+
+  React.useEffect(() => {
+    if (datesLoading || !dateOptions.length) return;
+    if (isSupportedDate(selectedDate, dateOptions)) return;
+
+    setSelectedDate(pickPreferredDate(dateOptions));
+  }, [dateOptions, datesLoading, selectedDate]);
 
   React.useEffect(() => {
     syncSelectionToUrl(selectedDate, selectedTheatre);
@@ -845,6 +904,7 @@ function App() {
     : "Browser refresh only reloads the latest published JSON. On GitHub Pages, new numbers appear after the collector runs and a fresh deploy is published.";
   const selectedTheatreLabel =
     THEATRE_OPTIONS.find((option) => option.value === selectedTheatre)?.label || "All Theatres";
+  const availableDateCount = dateOptions.length;
   const hasDiscoveryOnlyShows =
     filteredShows.length > 0 &&
     filteredShows.every((show) => show.source?.method === "bookmyshow-showtime-discovery");
@@ -868,25 +928,39 @@ function App() {
           <p className="hero__eyebrow">Madanapalle Live Tracker</p>
           <h1>City-wide BookMyShow tracking built for Madanapalle.</h1>
           <p className="hero__lede">
-            Switch dates like May 05, May 06, and May 07, then narrow the snapshot by theatre.
-            If BookMyShow has no shows for the selected date, the dashboard stays empty instead of
-            reusing stale numbers.
+            Dates are now generated from actual Madanapalle booking snapshots. Pick a theatre to
+            see only the dates where that theatre has BookMyShow shows, then refresh for live
+            booked-ticket counts.
           </p>
 
           <div className="selector-shell">
             <div className="date-strip" aria-label="Date selection">
-              {dateOptions.map((option) => (
-                <button
-                  key={option.value}
-                  className={`date-chip${selectedDate === option.value ? " date-chip--active" : ""}`}
-                  onClick={() => setSelectedDate(option.value)}
-                  type="button"
-                >
-                  <span className="date-chip__weekday">{option.weekday}</span>
-                  <strong className="date-chip__day">{option.day}</strong>
-                  <span className="date-chip__month">{option.month}</span>
-                </button>
-              ))}
+              {datesLoading ? <div className="date-strip__empty">Loading booking dates...</div> : null}
+              {!datesLoading && datesError ? (
+                <div className="date-strip__empty">Could not load booking dates.</div>
+              ) : null}
+              {!datesLoading && !datesError && !dateOptions.length ? (
+                <div className="date-strip__empty">
+                  No booking dates found for {selectedTheatreLabel}.
+                </div>
+              ) : null}
+              {!datesLoading && !datesError
+                ? dateOptions.map((option) => (
+                    <button
+                      key={option.value}
+                      className={`date-chip${selectedDate === option.value ? " date-chip--active" : ""}`}
+                      onClick={() => setSelectedDate(option.value)}
+                      type="button"
+                    >
+                      <span className="date-chip__weekday">{option.weekday}</span>
+                      <strong className="date-chip__day">{option.day}</strong>
+                      <span className="date-chip__month">{option.month}</span>
+                      <span className="date-chip__shows">
+                        {number(showsForDateOption(option, selectedTheatre))} shows
+                      </span>
+                    </button>
+                  ))
+                : null}
             </div>
 
             <label className="selector-select-shell">
@@ -925,6 +999,7 @@ function App() {
           <div className="meta-pill">
             <span>Theatre Filter</span>
             <strong>{selectedTheatreLabel}</strong>
+            <small>{number(availableDateCount)} booking dates</small>
           </div>
           <div className="meta-pill">
             <span>Snapshot Generated</span>

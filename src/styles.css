@@ -151,7 +151,8 @@ body::before {
 }
 
 .date-chip__weekday,
-.date-chip__month {
+.date-chip__month,
+.date-chip__shows {
   font-family: "Space Grotesk", sans-serif;
   font-size: 0.8rem;
   letter-spacing: 0.08em;
@@ -162,6 +163,23 @@ body::before {
   font-family: "Space Grotesk", sans-serif;
   font-size: 2rem;
   line-height: 1;
+}
+
+.date-chip__shows {
+  margin-top: 4px;
+  font-size: 0.68rem;
+  letter-spacing: 0.04em;
+  opacity: 0.72;
+}
+
+.date-strip__empty {
+  width: 100%;
+  padding: 16px;
+  border: 1px dashed rgba(22, 21, 20, 0.16);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.56);
+  color: var(--ink-soft);
+  line-height: 1.5;
 }
 
 .selector-select-shell {

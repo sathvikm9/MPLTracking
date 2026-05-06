@@ -1,0 +1,300 @@
+{
+  "version": 1,
+  "generatedAt": "2026-05-06T02:26:18.805Z",
+  "dates": [
+    {
+      "date": "2026-05-05",
+      "dateCode": "20260505",
+      "generatedAt": "2026-05-05T04:47:11.496Z",
+      "totalShows": 16,
+      "theatres": [
+        {
+          "venueCode": "ASRM",
+          "name": "ASR A/C 4K Laser Dolby Surround 7.1: Madanapalle",
+          "shortName": "ASR",
+          "totalShows": 4
+        },
+        {
+          "venueCode": "RTDM",
+          "name": "Ravi A/C 4K Laser Dolby Surround 7.1: Madanapalle",
+          "shortName": "Ravi",
+          "totalShows": 4
+        },
+        {
+          "venueCode": "MSDR",
+          "name": "Siddartha Cinemas:Screen 2 Dolby Laser,Madanapalle",
+          "shortName": "Siddartha",
+          "totalShows": 4
+        },
+        {
+          "venueCode": "SKMD",
+          "name": "Sri Krishna A/C 4K Dolby Atmos: Madanapalle",
+          "shortName": "Sri Krishna",
+          "totalShows": 4
+        }
+      ],
+      "theatreCounts": {
+        "ASRM": {
+          "totalShows": 4,
+          "shortName": "ASR",
+          "name": "ASR A/C 4K Laser Dolby Surround 7.1: Madanapalle"
+        },
+        "RTDM": {
+          "totalShows": 4,
+          "shortName": "Ravi",
+          "name": "Ravi A/C 4K Laser Dolby Surround 7.1: Madanapalle"
+        },
+        "MSDR": {
+          "totalShows": 4,
+          "shortName": "Siddartha",
+          "name": "Siddartha Cinemas:Screen 2 Dolby Laser,Madanapalle"
+        },
+        "SKMD": {
+          "totalShows": 4,
+          "shortName": "Sri Krishna",
+          "name": "Sri Krishna A/C 4K Dolby Atmos: Madanapalle"
+        }
+      },
+      "movies": [
+        {
+          "eventCode": "ET00380715",
+          "title": "Dacoit",
+          "language": "Telugu",
+          "format": "2D",
+          "totalShows": 3
+        },
+        {
+          "eventCode": "ET00493107",
+          "title": "GaayaPadda Simham",
+          "language": "Telugu",
+          "format": "2D",
+          "totalShows": 4
+        },
+        {
+          "eventCode": "ET00030041",
+          "title": "Ganga",
+          "language": "Telugu",
+          "format": "2D",
+          "totalShows": 1
+        },
+        {
+          "eventCode": "ET00496966",
+          "title": "Kara",
+          "language": "Telugu",
+          "format": "2D",
+          "totalShows": 4
+        },
+        {
+          "eventCode": "ET00495359",
+          "title": "Vaazha 2: Biopic of a Billion Bros",
+          "language": "Telugu",
+          "format": "2D",
+          "totalShows": 4
+        }
+      ]
+    },
+    {
+      "date": "2026-05-06",
+      "dateCode": "20260506",
+      "generatedAt": "2026-05-05T14:33:52.797Z",
+      "totalShows": 12,
+      "theatres": [
+        {
+          "venueCode": "RTDM",
+          "name": "Ravi A/C 4K Laser Dolby Surround 7.1: Madanapalle",
+          "shortName": "Ravi",
+          "totalShows": 4
+        },
+        {
+          "venueCode": "MSDR",
+          "name": "Siddartha Cinemas:Screen 2 Dolby Laser,Madanapalle",
+          "shortName": "Siddartha",
+          "totalShows": 4
+        },
+        {
+          "venueCode": "SKMD",
+          "name": "Sri Krishna A/C 4K Dolby Atmos: Madanapalle",
+          "shortName": "Sri Krishna",
+          "totalShows": 4
+        }
+      ],
+      "theatreCounts": {
+        "RTDM": {
+          "totalShows": 4,
+          "shortName": "Ravi",
+          "name": "Ravi A/C 4K Laser Dolby Surround 7.1: Madanapalle"
+        },
+        "MSDR": {
+          "totalShows": 4,
+          "shortName": "Siddartha",
+          "name": "Siddartha Cinemas:Screen 2 Dolby Laser,Madanapalle"
+        },
+        "SKMD": {
+          "totalShows": 4,
+          "shortName": "Sri Krishna",
+          "name": "Sri Krishna A/C 4K Dolby Atmos: Madanapalle"
+        }
+      },
+      "movies": [
+        {
+          "eventCode": "ET00380715",
+          "title": "Dacoit",
+          "language": "",
+          "format": "2D",
+          "totalShows": 3
+        },
+        {
+          "eventCode": "ET00030041",
+          "title": "Ganga",
+          "language": "",
+          "format": "2D",
+          "totalShows": 1
+        },
+        {
+          "eventCode": "ET00496966",
+          "title": "Kara",
+          "language": "",
+          "format": "2D",
+          "totalShows": 4
+        },
+        {
+          "eventCode": "ET00495359",
+          "title": "Vaazha 2: Biopic of a Billion Bros",
+          "language": "",
+          "format": "2D",
+          "totalShows": 4
+        }
+      ]
+    },
+    {
+      "date": "2026-05-07",
+      "dateCode": "20260507",
+      "generatedAt": "2026-05-05T14:34:17.397Z",
+      "totalShows": 16,
+      "theatres": [
+        {
+          "venueCode": "ASRM",
+          "name": "ASR A/C 4K Laser Dolby Surround 7.1: Madanapalle",
+          "shortName": "ASR",
+          "totalShows": 4
+        },
+        {
+          "venueCode": "RTDM",
+          "name": "Ravi A/C 4K Laser Dolby Surround 7.1: Madanapalle",
+          "shortName": "Ravi",
+          "totalShows": 4
+        },
+        {
+          "venueCode": "MSDR",
+          "name": "Siddartha Cinemas:Screen 2 Dolby Laser,Madanapalle",
+          "shortName": "Siddartha",
+          "totalShows": 4
+        },
+        {
+          "venueCode": "SKMD",
+          "name": "Sri Krishna A/C 4K Dolby Atmos: Madanapalle",
+          "shortName": "Sri Krishna",
+          "totalShows": 4
+        }
+      ],
+      "theatreCounts": {
+        "ASRM": {
+          "totalShows": 4,
+          "shortName": "ASR",
+          "name": "ASR A/C 4K Laser Dolby Surround 7.1: Madanapalle"
+        },
+        "RTDM": {
+          "totalShows": 4,
+          "shortName": "Ravi",
+          "name": "Ravi A/C 4K Laser Dolby Surround 7.1: Madanapalle"
+        },
+        "MSDR": {
+          "totalShows": 4,
+          "shortName": "Siddartha",
+          "name": "Siddartha Cinemas:Screen 2 Dolby Laser,Madanapalle"
+        },
+        "SKMD": {
+          "totalShows": 4,
+          "shortName": "Sri Krishna",
+          "name": "Sri Krishna A/C 4K Dolby Atmos: Madanapalle"
+        }
+      },
+      "movies": [
+        {
+          "eventCode": "ET00380715",
+          "title": "Dacoit",
+          "language": "",
+          "format": "2D",
+          "totalShows": 3
+        },
+        {
+          "eventCode": "ET00493107",
+          "title": "GaayaPadda Simham",
+          "language": "",
+          "format": "2D",
+          "totalShows": 4
+        },
+        {
+          "eventCode": "ET00030041",
+          "title": "Ganga",
+          "language": "",
+          "format": "2D",
+          "totalShows": 1
+        },
+        {
+          "eventCode": "ET00496966",
+          "title": "Kara",
+          "language": "",
+          "format": "2D",
+          "totalShows": 4
+        },
+        {
+          "eventCode": "ET00495359",
+          "title": "Vaazha 2: Biopic of a Billion Bros",
+          "language": "",
+          "format": "2D",
+          "totalShows": 4
+        }
+      ]
+    },
+    {
+      "date": "2026-05-08",
+      "dateCode": "20260508",
+      "generatedAt": "2026-05-05T14:35:10.409Z",
+      "totalShows": 2,
+      "theatres": [
+        {
+          "venueCode": "ASRM",
+          "name": "ASR A/C 4K Laser Dolby Surround 7.1: Madanapalle",
+          "shortName": "ASR",
+          "totalShows": 2
+        }
+      ],
+      "theatreCounts": {
+        "ASRM": {
+          "totalShows": 2,
+          "shortName": "ASR",
+          "name": "ASR A/C 4K Laser Dolby Surround 7.1: Madanapalle"
+        }
+      },
+      "movies": [
+        {
+          "eventCode": "ET00053894",
+          "title": "Ninnu Kori",
+          "language": "",
+          "format": "2D",
+          "totalShows": 2
+        }
+      ]
+    },
+    {
+      "date": "2026-05-09",
+      "dateCode": "20260509",
+      "generatedAt": "2026-05-05T14:35:34.721Z",
+      "totalShows": 0,
+      "theatres": [],
+      "theatreCounts": {},
+      "movies": []
+    }
+  ]
+}
