@@ -247,6 +247,7 @@ function buildDateOption(entry) {
 }
 
 function dateHasShowsForTheatre(entry, selectedTheatre) {
+  if (isPastIndiaDate(entry.value)) return false;
   if (selectedTheatre === "ALL") return Number(entry.totalShows || 0) > 0;
   return Number(entry.theatreCounts?.[selectedTheatre]?.totalShows || 0) > 0;
 }
@@ -274,7 +275,11 @@ function getInitialSelectedDate() {
   if (typeof window === "undefined") return getIndiaTodayIso();
 
   const urlDate = new URLSearchParams(window.location.search).get("date");
-  return /^\d{4}-\d{2}-\d{2}$/.test(urlDate || "") ? urlDate : getIndiaTodayIso();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(urlDate || "") && !isPastIndiaDate(urlDate)) {
+    return urlDate;
+  }
+
+  return getIndiaTodayIso();
 }
 
 function getInitialSelectedTheatre() {
