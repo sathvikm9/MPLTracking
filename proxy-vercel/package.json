@@ -1,5 +1,9 @@
 {
   "name": "mpltracking-live-proxy-vercel",
   "private": true,
-  "type": "module"
+  "type": "module",
+  "dependencies": {
+    "@sparticuz/chromium": "^131.0.1",
+    "playwright-core": "^1.59.1"
+  }
 }

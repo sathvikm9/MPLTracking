@@ -253,6 +253,7 @@ function buildDateOption(entry) {
   return {
     value: isoDate,
     totalShows: Number(entry.totalShows || 0),
+    availabilityOnly: Boolean(entry.availabilityOnly),
     theatres: entry.theatres || [],
     theatreCounts: entry.theatreCounts || {},
     movies: entry.movies || [],
@@ -262,13 +263,21 @@ function buildDateOption(entry) {
 
 function dateHasShowsForTheatre(entry, selectedTheatre) {
   if (isPastIndiaDate(entry.value)) return false;
+  if (entry.availabilityOnly && selectedTheatre === "ALL") return true;
+  if (entry.availabilityOnly && entry.theatreCounts?.[selectedTheatre]?.available) return true;
   if (selectedTheatre === "ALL") return Number(entry.totalShows || 0) > 0;
   return Number(entry.theatreCounts?.[selectedTheatre]?.totalShows || 0) > 0;
 }
 
 function showsForDateOption(option, selectedTheatre) {
+  if (option.availabilityOnly) return null;
   if (selectedTheatre === "ALL") return Number(option.totalShows || 0);
   return Number(option.theatreCounts?.[selectedTheatre]?.totalShows || 0);
+}
+
+function dateShowLabel(option, selectedTheatre) {
+  const showCount = showsForDateOption(option, selectedTheatre);
+  return showCount === null ? "booking open" : `${number(showCount)} shows`;
 }
 
 function pickPreferredDate(dateOptions) {
@@ -492,6 +501,7 @@ function useDateAvailability(selectedTheatre) {
   const [state, setState] = React.useState({
     loading: true,
     error: null,
+    notes: [],
     dateOptions: [],
     allDates: []
   });
@@ -531,6 +541,7 @@ function useDateAvailability(selectedTheatre) {
         setState({
           loading: false,
           error: null,
+          notes: manifest.meta?.notes || [],
           dateOptions,
           allDates
         });
@@ -541,6 +552,7 @@ function useDateAvailability(selectedTheatre) {
         setState({
           loading: false,
           error,
+          notes: [],
           dateOptions: [],
           allDates: []
         });
@@ -878,6 +890,7 @@ function App() {
   const {
     loading: datesLoading,
     error: datesError,
+    notes: dateNotes,
     dateOptions
   } = useDateAvailability(selectedTheatre);
   const { loading, error, data, refreshing, refresh } = useDashboardData(
@@ -939,7 +952,9 @@ function App() {
       ? "Refresh live data"
       : "Check for newer snapshot";
   const sourceNote = isLiveProxy
-    ? "Each date selection, theatre selection, and refresh asks the live proxy for current BookMyShow seat counts."
+    ? data.meta?.cache?.hit
+      ? "BookMyShow live discovery was blocked temporarily, so this view is using the last successful theatre-page result with a timestamp."
+      : "Each date selection, theatre selection, and refresh asks the live proxy for current BookMyShow theatre-page shows and seat counts."
     : "Browser refresh only reloads the latest published JSON. On GitHub Pages, new numbers appear after the collector runs and a fresh deploy is published.";
   const selectedTheatreLabel =
     THEATRE_OPTIONS.find((option) => option.value === selectedTheatre)?.label || "All Theatres";
@@ -997,7 +1012,7 @@ function App() {
                 ) : null}
                 {!datesLoading && !datesError && !dateOptions.length ? (
                   <div className="date-strip__empty">
-                    No booking dates found for {selectedTheatreLabel}.
+                    {dateNotes?.[0] || `No booking dates found for ${selectedTheatreLabel}.`}
                   </div>
                 ) : null}
                 {!datesLoading && !datesError
@@ -1012,7 +1027,7 @@ function App() {
                         <strong className="date-chip__day">{option.day}</strong>
                         <span className="date-chip__month">{option.month}</span>
                         <span className="date-chip__shows">
-                          {number(showsForDateOption(option, selectedTheatre))} shows
+                          {dateShowLabel(option, selectedTheatre)}
                         </span>
                       </button>
                     ))

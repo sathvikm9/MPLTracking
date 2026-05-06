@@ -1,34 +1,13 @@
 import { fetchMadanapalleShowtimesPayload } from "./madanapalle-showtimes.mjs";
+import {
+  discoverTheatreDates,
+  discoverTheatreDateShows,
+  MADANAPALLE_THEATRES
+} from "./theatre-discovery.mjs";
 
 export const DEFAULT_SNAPSHOT_BASE_URL = "https://sathvikm9.github.io/MPLTracking/data";
 const DEFAULT_FUTURE_SCAN_DAYS = 9;
 const MAX_FUTURE_SCAN_DAYS = 21;
-const MADANAPALLE_THEATRES = [
-  {
-    venueCode: "ASRM",
-    shortName: "ASR",
-    name: "ASR A/C 4K Laser Dolby Surround 7.1: Madanapalle",
-    fallbackCutoffMinutes: 15
-  },
-  {
-    venueCode: "RTDM",
-    shortName: "Ravi",
-    name: "Ravi A/C 4K Laser Dolby Surround 7.1: Madanapalle",
-    fallbackCutoffMinutes: 15
-  },
-  {
-    venueCode: "MSDR",
-    shortName: "Siddartha",
-    name: "Siddartha Cinemas:Screen 2 Dolby Laser,Madanapalle",
-    fallbackCutoffMinutes: 30
-  },
-  {
-    venueCode: "SKMD",
-    shortName: "Sri Krishna",
-    name: "Sri Krishna A/C 4K Dolby Atmos: Madanapalle",
-    fallbackCutoffMinutes: 15
-  }
-];
 
 function toNumber(value) {
   if (typeof value === "number" && Number.isFinite(value)) return value;
@@ -315,6 +294,35 @@ function buildDiscoverySnapshotsFromPayload(payload, theatreMap, targetDateCode 
   }
 
   return snapshots;
+}
+
+function normalizeDiscoveredCategories(rawCategories) {
+  const categories = Array.isArray(rawCategories) ? rawCategories : [];
+
+  return categories.map((category) => ({
+    name: category.PriceDesc || category.name || "Category",
+    label: category.label || category.PriceDesc || category.name || "Category",
+    price: toNumber(category.CurPrice || category.price || category.Price || 0),
+    totalSeats: toNumber(category.MaxSeats || category.totalSeats || 0),
+    availableSeats: toNumber(category.SeatsAvail || category.availableSeats || 0),
+    soldSeats: Math.max(
+      toNumber(category.MaxSeats || category.totalSeats || 0) -
+        toNumber(category.SeatsAvail || category.availableSeats || 0),
+      0
+    ),
+    unknownSeats: 0,
+    rows: []
+  }));
+}
+
+function buildSnapshotsFromTheatreShows(shows) {
+  return (shows || []).map((show) =>
+    buildSnapshotFromCategories(
+      show,
+      normalizeDiscoveredCategories(show.rawCategories),
+      "bookmyshow-theatre-page"
+    )
+  );
 }
 
 function summarizeByMovie(shows) {
@@ -670,6 +678,160 @@ async function discoverLiveShowsForDate({
   );
 }
 
+async function buildLiveOutputFromTheatreDiscovery({
+  discovered,
+  fetchImpl,
+  targetDate,
+  venueCode
+}) {
+  const notes = [...(discovered.meta?.notes || [])];
+  const baseShows = buildSnapshotsFromTheatreShows(discovered.shows || []);
+  const baseShowIndex = buildShowIndex(baseShows);
+  const theatreMap = buildTheatreMap(baseShows, MADANAPALLE_THEATRES);
+  const snapshotsById = new Map(baseShows.map((show) => [show.id, show]));
+  const eventCodes = [...new Set(baseShows.map((show) => show.eventCode).filter(Boolean))];
+  const successfulEventCodes = [];
+  const failedEventCodes = [];
+  const cachedEventCodes = [];
+  const targetDateCode = isoToDateCode(targetDate);
+
+  await Promise.all(
+    eventCodes.map(async (eventCode) => {
+      try {
+        const { payload, meta } = await fetchMadanapalleShowtimesPayload({
+          eventCode,
+          dateCode: targetDateCode,
+          venueCode,
+          retryRounds: 1,
+          fetchImpl
+        });
+
+        if (meta?.cache?.hit) cachedEventCodes.push(eventCode);
+
+        for (const snapshot of buildApiSnapshotsFromPayload(
+          payload,
+          theatreMap,
+          baseShowIndex,
+          targetDateCode
+        )) {
+          snapshotsById.set(snapshot.id, snapshot);
+        }
+
+        successfulEventCodes.push(eventCode);
+      } catch (error) {
+        failedEventCodes.push(eventCode);
+        notes.push(`Live seat-count refresh failed for ${eventCode}: ${error.message}`);
+      }
+    })
+  );
+
+  const output = buildOutputFromBaseline(
+    buildDiscoveryBaseline(null, targetDate),
+    Array.from(snapshotsById.values()),
+    notes
+  );
+  const liveShowCount = output.shows.filter(
+    (show) => show.source?.method === "live-proxy-showtimes"
+  ).length;
+
+  return {
+    ...output,
+    meta: {
+      ...(output.meta || {}),
+      source: "bookmyshow-theatre-page",
+      liveDiscovery: true,
+      cache: discovered.meta?.cache || {
+        hit: false
+      },
+      pageTitle: discovered.meta?.pageTitle,
+      selectedVenueCode: venueCode,
+      liveRefresh: {
+        attemptedEvents: eventCodes.length,
+        successfulEvents: successfulEventCodes.length,
+        failedEvents: failedEventCodes.length,
+        failedEventCodes,
+        cachedEvents: cachedEventCodes.length,
+        cachedEventCodes,
+        liveShowCount,
+        fallbackShowCount: output.shows.length - liveShowCount
+      }
+    }
+  };
+}
+
+async function buildTheatreLiveSnapshot({ date, venueCode, fetchImpl }) {
+  if (venueCode) {
+    const discovered = await discoverTheatreDateShows({
+      venueCode,
+      date
+    });
+    return buildLiveOutputFromTheatreDiscovery({
+      discovered,
+      fetchImpl,
+      targetDate: date,
+      venueCode
+    });
+  }
+
+  const theatreOutputs = await Promise.all(
+    MADANAPALLE_THEATRES.map(async (theatre) => {
+      const discovered = await discoverTheatreDateShows({
+        venueCode: theatre.venueCode,
+        date
+      });
+      return buildLiveOutputFromTheatreDiscovery({
+        discovered,
+        fetchImpl,
+        targetDate: date,
+        venueCode: theatre.venueCode
+      });
+    })
+  );
+  const shows = theatreOutputs.flatMap((output) => output.shows || []);
+  const notes = theatreOutputs.flatMap((output) => output.meta?.notes || []);
+  const output = buildOutputFromBaseline(buildDiscoveryBaseline(null, date), shows, notes);
+
+  return {
+    ...output,
+    meta: {
+      ...(output.meta || {}),
+      source: "bookmyshow-theatre-page",
+      liveDiscovery: true,
+      cache: {
+        hit: theatreOutputs.some((output) => output.meta?.cache?.hit)
+      },
+      liveRefresh: {
+        attemptedEvents: theatreOutputs.reduce(
+          (sum, output) => sum + Number(output.meta?.liveRefresh?.attemptedEvents || 0),
+          0
+        ),
+        successfulEvents: theatreOutputs.reduce(
+          (sum, output) => sum + Number(output.meta?.liveRefresh?.successfulEvents || 0),
+          0
+        ),
+        failedEvents: theatreOutputs.reduce(
+          (sum, output) => sum + Number(output.meta?.liveRefresh?.failedEvents || 0),
+          0
+        ),
+        failedEventCodes: theatreOutputs.flatMap(
+          (output) => output.meta?.liveRefresh?.failedEventCodes || []
+        ),
+        cachedEvents: theatreOutputs.reduce(
+          (sum, output) => sum + Number(output.meta?.liveRefresh?.cachedEvents || 0),
+          0
+        ),
+        cachedEventCodes: theatreOutputs.flatMap(
+          (output) => output.meta?.liveRefresh?.cachedEventCodes || []
+        ),
+        liveShowCount: shows.filter((show) => show.source?.method === "live-proxy-showtimes")
+          .length,
+        fallbackShowCount: shows.filter((show) => show.source?.method !== "live-proxy-showtimes")
+          .length
+      }
+    }
+  };
+}
+
 async function refreshLiveSnapshot(baseline, fetchImpl) {
   const notes = [];
   const baseShows = Array.isArray(baseline?.shows) ? baseline.shows : [];
@@ -746,9 +908,37 @@ export async function buildLiveSnapshot({
   fetchImpl = fetch
 }) {
   const url = new URL(requestUrl);
-  const date = url.searchParams.get("date");
+  const date = url.searchParams.get("date") || getIndiaTodayIso();
   const venueCode = url.searchParams.get("venueCode");
   let baseline;
+
+  try {
+    return await buildTheatreLiveSnapshot({
+      date,
+      venueCode,
+      fetchImpl
+    });
+  } catch (error) {
+    if (venueCode) {
+      const output = buildOutputFromBaseline(buildDiscoveryBaseline(null, date), [], [
+        `BookMyShow theatre-page live discovery failed for ${venueCode}: ${error.message}`
+      ]);
+      return {
+        ...output,
+        meta: {
+          ...(output.meta || {}),
+          source: "bookmyshow-theatre-page",
+          liveDiscovery: true,
+          selectedVenueCode: venueCode,
+          cache: {
+            hit: false
+          }
+        }
+      };
+    }
+
+    baseline = null;
+  }
 
   try {
     baseline = await fetchBaselineSnapshot(fetchImpl, snapshotBaseUrl, date);
@@ -852,6 +1042,38 @@ function buildDateManifestEntry(output) {
   };
 }
 
+function buildAvailabilityOnlyEntry(dateOption, theatre) {
+  const theatreEntry = theatre
+    ? {
+        venueCode: theatre.venueCode,
+        name: theatre.name,
+        shortName: theatre.shortName,
+        totalShows: 0,
+        available: true
+      }
+    : null;
+
+  return {
+    date: dateOption.date,
+    dateCode: dateOption.dateCode || isoToDateCode(dateOption.date),
+    generatedAt: new Date().toISOString(),
+    availabilityOnly: true,
+    totalShows: 0,
+    theatres: theatreEntry ? [theatreEntry] : [],
+    theatreCounts: theatreEntry
+      ? {
+          [theatreEntry.venueCode]: {
+            totalShows: 0,
+            shortName: theatreEntry.shortName,
+            name: theatreEntry.name,
+            available: true
+          }
+        }
+      : {},
+    movies: []
+  };
+}
+
 export async function buildLiveDateManifest({
   requestUrl,
   snapshotBaseUrl = DEFAULT_SNAPSHOT_BASE_URL,
@@ -863,6 +1085,109 @@ export async function buildLiveDateManifest({
     Math.max(Number(url.searchParams.get("days") || DEFAULT_FUTURE_SCAN_DAYS), 1),
     MAX_FUTURE_SCAN_DAYS
   );
+  const discoveredDateEntries = [];
+
+  try {
+    if (venueCode) {
+      const discoveredDates = await discoverTheatreDates({ venueCode, days });
+      const outputs = await Promise.all(
+        discoveredDates.dateOptions.slice(0, days).map(async (dateOption) => {
+          try {
+            const discovered =
+              dateOption.date === discoveredDates.targetDate && discoveredDates.shows?.length
+                ? discoveredDates
+                : await discoverTheatreDateShows({
+                    venueCode,
+                    date: dateOption.date
+                  });
+            return buildLiveOutputFromTheatreDiscovery({
+              discovered,
+              fetchImpl,
+              targetDate: dateOption.date,
+              venueCode
+            });
+          } catch {
+            return buildAvailabilityOnlyEntry(dateOption, discoveredDates.theatre);
+          }
+        })
+      );
+
+      for (const output of outputs) {
+        if (output.availabilityOnly) {
+          discoveredDateEntries.push(output);
+        } else if (output.shows.length) {
+          discoveredDateEntries.push(buildDateManifestEntry(output));
+        }
+      }
+
+      return {
+        version: 1,
+        generatedAt: new Date().toISOString(),
+        liveDiscovery: true,
+        source: "bookmyshow-theatre-page",
+        venueCode,
+        cache: discoveredDates.meta?.cache || {
+          hit: false
+        },
+        dates: discoveredDateEntries
+      };
+    }
+
+    const theatreDateSets = await Promise.all(
+      MADANAPALLE_THEATRES.map((theatre) =>
+        discoverTheatreDates({
+          venueCode: theatre.venueCode,
+          days
+        })
+      )
+    );
+    const dateCodes = [
+      ...new Set(
+        theatreDateSets.flatMap((dateSet) =>
+          (dateSet.dateOptions || []).slice(0, days).map((dateOption) => dateOption.date)
+        )
+      )
+    ].sort();
+
+    for (const date of dateCodes) {
+      const output = await buildTheatreLiveSnapshot({
+        date,
+        venueCode: "",
+        fetchImpl
+      });
+      if (output.shows.length) discoveredDateEntries.push(buildDateManifestEntry(output));
+    }
+
+    return {
+      version: 1,
+      generatedAt: new Date().toISOString(),
+      liveDiscovery: true,
+      source: "bookmyshow-theatre-page",
+      venueCode,
+      cache: {
+        hit: theatreDateSets.some((dateSet) => dateSet.meta?.cache?.hit)
+      },
+      dates: discoveredDateEntries
+    };
+  } catch (error) {
+    if (venueCode) {
+      return {
+        version: 1,
+        generatedAt: new Date().toISOString(),
+        liveDiscovery: true,
+        source: "bookmyshow-theatre-page",
+        venueCode,
+        dates: [],
+        meta: {
+          status: "error",
+          notes: [`BookMyShow theatre-page date discovery failed for ${venueCode}: ${error.message}`]
+        }
+      };
+    }
+
+    // Fall through to the older event-code scan only for the expensive all-theatres overview.
+  }
+
   const today = getIndiaTodayIso();
   const latestBaseline = await fetchBaselineSnapshot(fetchImpl, snapshotBaseUrl, "today").catch(
     () => null
