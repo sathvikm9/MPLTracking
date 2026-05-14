@@ -164,6 +164,7 @@ export async function fetchMadanapalleShowtimesPayload({
   dateCode,
   venueCode = "",
   retryRounds = SHOWTIME_API_RETRY_ROUNDS,
+  strictDate = true,
   fetchImpl = fetch
 }) {
   const normalizedEventCode = String(eventCode || "").trim().toUpperCase();
@@ -214,7 +215,7 @@ export async function fetchMadanapalleShowtimesPayload({
         const fullPayload = cloneJson(payload);
         const filteredPayload = filterPayload(payload, {
           venueCode,
-          dateCode: normalizedDateCode
+          dateCode: strictDate ? normalizedDateCode : ""
         });
         const meta = {
           regionCode: MADANAPALLE_REGION_CODE,

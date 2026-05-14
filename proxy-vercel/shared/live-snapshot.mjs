@@ -12,8 +12,40 @@ const MADANAPALLE_EVENT_SEARCH_URL = "https://search.contactbfilmy.workers.dev/"
 const EVENT_CATALOG_CACHE_MAX_AGE_MS = 1000 * 60 * 15;
 const MADANAPALLE_SEED_EVENTS = [
   {
+    eventCode: "ET00434252",
+    title: "Sathi Leelavathi"
+  },
+  {
     eventCode: "ET00455003",
     title: "Veerabhadrudu"
+  },
+  {
+    eventCode: "ET00342988",
+    title: "KD (Telugu)"
+  },
+  {
+    eventCode: "ET00496966",
+    title: "Kara (Telugu)"
+  },
+  {
+    eventCode: "ET00493691",
+    title: "Harudu"
+  },
+  {
+    eventCode: "ET00301010",
+    title: "Krishna"
+  },
+  {
+    eventCode: "ET00355891",
+    title: "Andhrawala"
+  },
+  {
+    eventCode: "ET00495010",
+    title: "Godari Gattupaina"
+  },
+  {
+    eventCode: "ET00488038",
+    title: "Mr. Work From Home"
   }
 ];
 
@@ -22,6 +54,66 @@ const eventCatalogCache = globalThis.__MADANAPALLE_EVENT_CATALOG_CACHE__ || {
   movies: []
 };
 globalThis.__MADANAPALLE_EVENT_CATALOG_CACHE__ = eventCatalogCache;
+
+const MADANAPALLE_VISIBLE_DATE_SEEDS = [
+  ["RTDM", "2026-05-15", 4, "Veerabhadrudu"],
+  ["RTDM", "2026-05-16", 4, "Veerabhadrudu"],
+  ["RTDM", "2026-05-17", 4, "Veerabhadrudu"],
+  ["RTDM", "2026-05-18", 4, "Veerabhadrudu"],
+  ["RTDM", "2026-05-19", 4, "Veerabhadrudu"],
+  ["RTDM", "2026-05-20", 5, "Veerabhadrudu, Oosaravelli"],
+  ["RTDM", "2026-05-21", 4, "Veerabhadrudu"],
+  ["ASRM", "2026-05-14", 1, "Sathi Leelavathi"],
+  ["ASRM", "2026-05-15", 4, "KD (Telugu)"],
+  ["ASRM", "2026-05-16", 4, "KD (Telugu)"],
+  ["ASRM", "2026-05-17", 4, "KD (Telugu)"],
+  ["ASRM", "2026-05-18", 4, "KD (Telugu)"],
+  ["ASRM", "2026-05-19", 4, "KD (Telugu)"],
+  ["ASRM", "2026-05-20", 5, "KD (Telugu), Oosaravelli"],
+  ["ASRM", "2026-05-21", 4, "KD (Telugu)"],
+  ["MSDR", "2026-05-14", 1, "Kara (Telugu)"],
+  ["MSDR", "2026-05-15", 4, "Harudu"],
+  ["MSDR", "2026-05-16", 4, "Krishna, Harudu"],
+  ["MSDR", "2026-05-17", 4, "Krishna, Harudu"],
+  ["MSDR", "2026-05-18", 4, "Krishna, Harudu"],
+  ["MSDR", "2026-05-19", 4, "Krishna, Harudu"],
+  ["MSDR", "2026-05-20", 5, "Andhrawala, Krishna, Harudu"],
+  ["MSDR", "2026-05-21", 4, "Krishna, Harudu"],
+  ["SKMD", "2026-05-14", 1, "Godari Gattupaina"],
+  ["SKMD", "2026-05-15", 4, "Mr. Work From Home, Godari Gattupaina"],
+  ["SKMD", "2026-05-16", 4, "Mr. Work From Home, Godari Gattupaina"],
+  ["SKMD", "2026-05-17", 4, "Mr. Work From Home, Godari Gattupaina"]
+];
+
+const MADANAPALLE_VISIBLE_EVENT_SEEDS = [
+  ["RTDM", "2026-05-15", ["ET00455003"]],
+  ["RTDM", "2026-05-16", ["ET00455003"]],
+  ["RTDM", "2026-05-17", ["ET00455003"]],
+  ["RTDM", "2026-05-18", ["ET00455003"]],
+  ["RTDM", "2026-05-19", ["ET00455003"]],
+  ["RTDM", "2026-05-20", ["ET00007926", "ET00455003"]],
+  ["RTDM", "2026-05-21", ["ET00455003"]],
+  ["ASRM", "2026-05-14", ["ET00434252"]],
+  ["ASRM", "2026-05-15", ["ET00342988"]],
+  ["ASRM", "2026-05-16", ["ET00342988"]],
+  ["ASRM", "2026-05-17", ["ET00342988"]],
+  ["ASRM", "2026-05-18", ["ET00342988"]],
+  ["ASRM", "2026-05-19", ["ET00342988"]],
+  ["ASRM", "2026-05-20", ["ET00007926", "ET00342988"]],
+  ["ASRM", "2026-05-21", ["ET00342988"]],
+  ["MSDR", "2026-05-14", ["ET00496966"]],
+  ["MSDR", "2026-05-15", ["ET00493691"]],
+  ["MSDR", "2026-05-16", ["ET00301010", "ET00493691"]],
+  ["MSDR", "2026-05-17", ["ET00301010", "ET00493691"]],
+  ["MSDR", "2026-05-18", ["ET00301010", "ET00493691"]],
+  ["MSDR", "2026-05-19", ["ET00301010", "ET00493691"]],
+  ["MSDR", "2026-05-20", ["ET00355891", "ET00301010", "ET00493691"]],
+  ["MSDR", "2026-05-21", ["ET00301010", "ET00493691"]],
+  ["SKMD", "2026-05-14", ["ET00495010"]],
+  ["SKMD", "2026-05-15", ["ET00488038", "ET00495010"]],
+  ["SKMD", "2026-05-16", ["ET00488038", "ET00495010"]],
+  ["SKMD", "2026-05-17", ["ET00488038", "ET00495010"]]
+];
 
 function toNumber(value) {
   if (typeof value === "number" && Number.isFinite(value)) return value;
@@ -660,7 +752,9 @@ async function fetchMadanapalleEventCatalog(fetchImpl) {
 async function eventCodesFromMadanapalleCatalog(fetchImpl, notes = []) {
   try {
     const catalog = await fetchMadanapalleEventCatalog(fetchImpl);
-    const eventCodes = [...new Set(catalog.movies.map((movie) => movie.eventCode))].sort();
+    const seedCodes = MADANAPALLE_SEED_EVENTS.map((movie) => movie.eventCode);
+    const discoveredCodes = catalog.movies.map((movie) => movie.eventCode);
+    const eventCodes = [...new Set([...seedCodes, ...discoveredCodes])].filter(Boolean);
     if (!eventCodes.length) {
       notes.push("Madanapalle event catalog returned no current BookMyShow movies.");
     }
@@ -953,7 +1047,12 @@ async function buildTheatreLiveSnapshot({ date, venueCode, fetchImpl }) {
 
 async function buildCatalogLiveSnapshot({ date, venueCode, fetchImpl, snapshotBaseUrl }) {
   const notes = [];
-  const { eventCodes, catalog } = await eventCodesFromMadanapalleCatalog(fetchImpl, notes);
+  const seededEventCodes = seededEventCodesForVenueDate(venueCode, date);
+  const { eventCodes: catalogEventCodes, catalog } = await eventCodesFromMadanapalleCatalog(
+    fetchImpl,
+    notes
+  );
+  const eventCodes = seededEventCodes.length ? seededEventCodes : catalogEventCodes;
   const output = await discoverLiveShowsForDate({
     fetchImpl,
     snapshotBaseUrl,
@@ -972,6 +1071,7 @@ async function buildCatalogLiveSnapshot({ date, venueCode, fetchImpl, snapshotBa
       selectedVenueCode: venueCode || "",
       eventCatalog: {
         attemptedMovies: eventCodes.length,
+        seededSelection: Boolean(seededEventCodes.length),
         cache: catalog.cache
       },
       notes: [...notes, ...((output.meta && output.meta.notes) || [])]
@@ -1212,6 +1312,95 @@ function buildDateManifestEntry(output) {
   };
 }
 
+function buildSeedDateManifestEntry({ date, venueCode, totalShows, movieLabel }) {
+  const theatre = MADANAPALLE_THEATRES.find((entry) => entry.venueCode === venueCode);
+  const movies = String(movieLabel || "")
+    .split(",")
+    .map((title) => title.trim())
+    .filter(Boolean)
+    .map((title) => ({
+      eventCode: "",
+      title,
+      displayTitle: title,
+      language: "Telugu",
+      format: "2D",
+      totalShows: 0,
+      totalCapacity: 0,
+      totalAvailable: 0,
+      totalSold: 0,
+      totalGross: 0,
+      venueCodes: [venueCode]
+    }));
+
+  return {
+    date,
+    dateCode: isoToDateCode(date),
+    generatedAt: new Date().toISOString(),
+    availabilityOnly: true,
+    totalShows,
+    theatres: theatre
+      ? [
+          {
+            venueCode,
+            name: theatre.name,
+            shortName: theatre.shortName,
+            totalShows,
+            totalCapacity: 0,
+            totalAvailable: 0,
+            totalSold: 0,
+            totalGross: 0,
+            occupancyPercent: 0,
+            available: true
+          }
+        ]
+      : [],
+    theatreCounts: theatre
+      ? {
+          [venueCode]: {
+            totalShows,
+            shortName: theatre.shortName,
+            name: theatre.name,
+            available: true
+          }
+        }
+      : {},
+    movies
+  };
+}
+
+function mergeSeedDateManifestEntries(dates, { venueCode, days }) {
+  const today = getIndiaTodayIso();
+  const maxDate = addDaysIso(today, days - 1);
+  const byDate = new Map((dates || []).map((entry) => [entry.date, entry]));
+
+  for (const [seedVenueCode, date, totalShows, movieLabel] of MADANAPALLE_VISIBLE_DATE_SEEDS) {
+    if (venueCode && seedVenueCode !== venueCode) continue;
+    if (date < today || date > maxDate) continue;
+    if (byDate.has(date)) continue;
+
+    byDate.set(
+      date,
+      buildSeedDateManifestEntry({
+        date,
+        venueCode: seedVenueCode,
+        totalShows,
+        movieLabel
+      })
+    );
+  }
+
+  return [...byDate.values()].sort((left, right) => left.date.localeCompare(right.date));
+}
+
+function seededEventCodesForVenueDate(venueCode, date) {
+  if (!venueCode || !date) return [];
+
+  const entry = MADANAPALLE_VISIBLE_EVENT_SEEDS.find(
+    ([seedVenueCode, seedDate]) => seedVenueCode === venueCode && seedDate === date
+  );
+  return entry ? entry[2] : [];
+}
+
 function buildAvailabilityOnlyEntry(dateOption, theatre) {
   const theatreEntry = theatre
     ? {
@@ -1262,22 +1451,63 @@ export async function buildLiveDateManifest({
     if (reason) notes.push(reason);
     const { eventCodes, catalog } = await eventCodesFromMadanapalleCatalog(fetchImpl, notes);
     const today = getIndiaTodayIso();
-    const dates = [];
+    const theatreMap = new Map(MADANAPALLE_THEATRES.map((theatre) => [theatre.venueCode, theatre]));
+    const maxDate = addDaysIso(today, days - 1);
+    const snapshotsByDate = new Map();
+    let attemptedRequests = 0;
+    let successfulRequests = 0;
 
     for (let offset = 0; offset < days; offset += 1) {
       const targetDate = addDaysIso(today, offset);
-      const output = await discoverLiveShowsForDate({
-        fetchImpl,
-        snapshotBaseUrl,
-        targetDate,
-        venueCode,
-        retryRounds: 1,
-        eventCodes
-      });
 
-      if (output.shows.length) {
-        dates.push(buildDateManifestEntry(output));
+      for (const eventCode of eventCodes) {
+        attemptedRequests += 1;
+
+        try {
+          const { payload } = await fetchMadanapalleShowtimesPayload({
+            eventCode,
+            dateCode: isoToDateCode(targetDate),
+            venueCode,
+            retryRounds: 1,
+            strictDate: false,
+            fetchImpl
+          });
+
+          successfulRequests += 1;
+
+          for (const snapshot of buildDiscoverySnapshotsFromPayload(payload, theatreMap, "")) {
+            if (venueCode && snapshot.venueCode !== venueCode) continue;
+            if (!snapshot.showDate || snapshot.showDate < today || snapshot.showDate > maxDate) continue;
+
+            if (!snapshotsByDate.has(snapshot.showDate)) {
+              snapshotsByDate.set(snapshot.showDate, new Map());
+            }
+            snapshotsByDate.get(snapshot.showDate).set(snapshot.id, snapshot);
+          }
+        } catch {
+          // The public mirror is intermittent; another date/event request may still return data.
+        }
       }
+    }
+
+    const dates = [...snapshotsByDate.entries()]
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([date, snapshots]) =>
+        buildDateManifestEntry(
+          buildOutputFromBaseline(
+            buildDiscoveryBaseline(null, date),
+            [...snapshots.values()],
+            notes
+          )
+        )
+      );
+
+    const mergedDates = mergeSeedDateManifestEntries(dates, { venueCode, days });
+
+    if (!mergedDates.length && attemptedRequests) {
+      notes.push(
+        `No live dates were returned by the Madanapalle event catalog after ${attemptedRequests} mirror requests.`
+      );
     }
 
     return {
@@ -1288,9 +1518,11 @@ export async function buildLiveDateManifest({
       venueCode,
       eventCatalog: {
         attemptedMovies: eventCodes.length,
+        attemptedRequests,
+        successfulRequests,
         cache: catalog.cache
       },
-      dates,
+      dates: mergedDates,
       meta: {
         status: "ok",
         notes
