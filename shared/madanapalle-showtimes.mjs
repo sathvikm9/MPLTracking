@@ -164,6 +164,7 @@ export async function fetchMadanapalleShowtimesPayload({
   dateCode,
   venueCode = "",
   retryRounds = SHOWTIME_API_RETRY_ROUNDS,
+  allowLastGoodCache = true,
   fetchImpl = fetch
 }) {
   const normalizedEventCode = String(eventCode || "").trim().toUpperCase();
@@ -262,14 +263,16 @@ export async function fetchMadanapalleShowtimesPayload({
     }
   }
 
-  const cached = readLastGoodPayload({
-    eventCode: normalizedEventCode,
-    dateCode: normalizedDateCode,
-    venueCode,
-    attempts
-  });
-  if (cached) {
-    return cached;
+  if (allowLastGoodCache) {
+    const cached = readLastGoodPayload({
+      eventCode: normalizedEventCode,
+      dateCode: normalizedDateCode,
+      venueCode,
+      attempts
+    });
+    if (cached) {
+      return cached;
+    }
   }
 
   const error = lastError || new Error(`Unable to fetch showtime payload for ${normalizedEventCode}`);
@@ -284,11 +287,13 @@ export async function buildMadanapalleShowtimesMirror({ requestUrl, fetchImpl = 
   const date = url.searchParams.get("date");
   const dateCode = url.searchParams.get("dateCode");
   const venueCode = url.searchParams.get("venueCode") || "";
+  const strictLiveOnly = url.searchParams.get("strict") === "1";
   const { payload, meta } = await fetchMadanapalleShowtimesPayload({
     eventCode,
     date,
     dateCode,
     venueCode,
+    allowLastGoodCache: !strictLiveOnly,
     fetchImpl
   });
 

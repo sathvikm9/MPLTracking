@@ -807,7 +807,8 @@ async function discoverLiveShowsForDate({
   venueCode = "",
   seedBaseline = null,
   retryRounds,
-  eventCodes: providedEventCodes = null
+  eventCodes: providedEventCodes = null,
+  allowLastGoodCache = true
 }) {
   const notes = [];
   const targetDateCode = isoToDateCode(targetDate);
@@ -842,6 +843,7 @@ async function discoverLiveShowsForDate({
         dateCode: targetDateCode,
         venueCode,
         retryRounds,
+        allowLastGoodCache,
         fetchImpl
       });
 
@@ -895,7 +897,8 @@ async function buildLiveOutputFromTheatreDiscovery({
   discovered,
   fetchImpl,
   targetDate,
-  venueCode
+  venueCode,
+  allowLastGoodCache = true
 }) {
   const notes = [...(discovered.meta?.notes || [])];
   const baseShows = buildSnapshotsFromTheatreShows(discovered.shows || []);
@@ -916,6 +919,7 @@ async function buildLiveOutputFromTheatreDiscovery({
           dateCode: targetDateCode,
           venueCode,
           retryRounds: 1,
+          allowLastGoodCache,
           fetchImpl
         });
 
@@ -972,7 +976,7 @@ async function buildLiveOutputFromTheatreDiscovery({
   };
 }
 
-async function buildTheatreLiveSnapshot({ date, venueCode, fetchImpl }) {
+async function buildTheatreLiveSnapshot({ date, venueCode, fetchImpl, allowLastGoodCache = true }) {
   if (venueCode) {
     const discovered = await discoverTheatreDateShows({
       venueCode,
@@ -982,7 +986,8 @@ async function buildTheatreLiveSnapshot({ date, venueCode, fetchImpl }) {
       discovered,
       fetchImpl,
       targetDate: date,
-      venueCode
+      venueCode,
+      allowLastGoodCache
     });
   }
 
@@ -996,7 +1001,8 @@ async function buildTheatreLiveSnapshot({ date, venueCode, fetchImpl }) {
         discovered,
         fetchImpl,
         targetDate: date,
-        venueCode: theatre.venueCode
+        venueCode: theatre.venueCode,
+        allowLastGoodCache
       });
     })
   );
@@ -1045,7 +1051,13 @@ async function buildTheatreLiveSnapshot({ date, venueCode, fetchImpl }) {
   };
 }
 
-async function buildCatalogLiveSnapshot({ date, venueCode, fetchImpl, snapshotBaseUrl }) {
+async function buildCatalogLiveSnapshot({
+  date,
+  venueCode,
+  fetchImpl,
+  snapshotBaseUrl,
+  allowLastGoodCache = true
+}) {
   const notes = [];
   const seededEventCodes = seededEventCodesForVenueDate(venueCode, date);
   const { eventCodes: catalogEventCodes, catalog } = await eventCodesFromMadanapalleCatalog(
@@ -1060,8 +1072,18 @@ async function buildCatalogLiveSnapshot({ date, venueCode, fetchImpl, snapshotBa
     venueCode,
     seedBaseline: null,
     retryRounds: 2,
-    eventCodes
+    eventCodes,
+    allowLastGoodCache
   });
+  const liveRefresh = output.meta?.liveRefresh || {};
+  if (
+    !allowLastGoodCache &&
+    Number(liveRefresh.attemptedEvents || 0) > 0 &&
+    Number(liveRefresh.failedEvents || 0) >= Number(liveRefresh.attemptedEvents || 0) &&
+    !(output.shows || []).length
+  ) {
+    throw new Error("Live mirror fallback failed for all selected events.");
+  }
 
   return {
     ...output,
@@ -1164,7 +1186,8 @@ export async function buildLiveSnapshot({
     return await buildTheatreLiveSnapshot({
       date,
       venueCode,
-      fetchImpl
+      fetchImpl,
+      allowLastGoodCache: !strictLiveOnly
     });
   } catch (error) {
     try {
@@ -1172,7 +1195,8 @@ export async function buildLiveSnapshot({
         date,
         venueCode,
         fetchImpl,
-        snapshotBaseUrl
+        snapshotBaseUrl,
+        allowLastGoodCache: !strictLiveOnly
       });
 
       return {

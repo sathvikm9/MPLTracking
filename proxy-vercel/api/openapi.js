@@ -230,6 +230,18 @@ function buildOpenApiSpec(req) {
               example: "RTDM"
             },
             {
+              name: "strict",
+              in: "query",
+              required: false,
+              description:
+                "Set to 1 to disable the proxy last-good cache and fail if every live mirror fails.",
+              schema: {
+                type: "string",
+                enum: ["1"]
+              },
+              example: "1"
+            },
+            {
               name: "_",
               in: "query",
               required: false,
