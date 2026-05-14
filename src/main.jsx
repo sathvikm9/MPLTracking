@@ -969,11 +969,10 @@ function MovieWiseBoard({ shows, emptyMessage }) {
             {group.shows.map((show) => (
               <div className="movie-line" key={show.id}>
                 <p className="movie-line__sentence">
-                  <strong>{show.theatreShortName}</strong> {show.showTimeLabel}{" "}
-                  {movieLabelFromShow(show)} {ticketLabel(show.soldSeats)}
+                  {show.theatreShortName} - {show.showTimeLabel} - {movieLabelFromShow(show)}
                 </p>
-                <p className="movie-line__meta">
-                  {number(show.availableSeats)} available · {number(show.totalSeats)} total ·{" "}
+                <p className="movie-line__result">
+                  {ticketLabel(show.soldSeats)} Booked - {number(show.availableSeats)} available ·{" "}
                   {currency(showGross(show))} gross
                 </p>
                 <p className="movie-line__meta">{categoryBreakdown(show)}</p>
@@ -997,8 +996,7 @@ function ShowCards({ shows, emptyMessage }) {
         <article className="show-card" key={show.id}>
           <div>
             <p className="show-card__time">{show.showTimeLabel}</p>
-            <h3>{movieLabelFromShow(show)}</h3>
-            <p>{show.theatreShortName}</p>
+            <h3>{movieLabelFromShow(show)} - {show.theatreShortName}</h3>
           </div>
           <div className="show-card__numbers">
             <strong>{ticketLabel(show.soldSeats)}</strong>
@@ -1284,7 +1282,6 @@ function App() {
               render: (show) => (
                 <div>
                   <strong>{show.theatreShortName}</strong>
-                  <div className="table-subline">{movieLabelFromShow(show)}</div>
                 </div>
               )
             },

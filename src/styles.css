@@ -505,6 +505,11 @@ tr:last-child td {
   margin: 0;
 }
 
+.show-card h3 {
+  color: var(--ink);
+  font-weight: 800;
+}
+
 .show-card__time {
   width: fit-content;
   padding: 8px 11px;
@@ -601,11 +606,21 @@ tr:last-child td {
 }
 
 .movie-line__sentence,
+.movie-line__result,
 .movie-line__meta {
   margin: 0;
 }
 
 .movie-line__sentence {
+  line-height: 1.55;
+  color: var(--ink);
+  font-weight: 800;
+}
+
+.movie-line__result {
+  margin-top: 6px;
+  color: var(--warm);
+  font-weight: 800;
   line-height: 1.55;
 }
 
