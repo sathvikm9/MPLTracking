@@ -8,6 +8,20 @@ import {
 export const DEFAULT_SNAPSHOT_BASE_URL = "https://sathvikm9.github.io/MPLTracking/data";
 const DEFAULT_FUTURE_SCAN_DAYS = 9;
 const MAX_FUTURE_SCAN_DAYS = 21;
+const MADANAPALLE_EVENT_SEARCH_URL = "https://search.contactbfilmy.workers.dev/";
+const EVENT_CATALOG_CACHE_MAX_AGE_MS = 1000 * 60 * 15;
+const MADANAPALLE_SEED_EVENTS = [
+  {
+    eventCode: "ET00455003",
+    title: "Veerabhadrudu"
+  }
+];
+
+const eventCatalogCache = globalThis.__MADANAPALLE_EVENT_CATALOG_CACHE__ || {
+  cachedAtMs: 0,
+  movies: []
+};
+globalThis.__MADANAPALLE_EVENT_CATALOG_CACHE__ = eventCatalogCache;
 
 function toNumber(value) {
   if (typeof value === "number" && Number.isFinite(value)) return value;
@@ -20,6 +34,10 @@ function toNumber(value) {
 
 function isoToDateCode(date) {
   return String(date || "").replaceAll("-", "");
+}
+
+function eventCodeFromMovie(movie) {
+  return String(movie?.id || movie?.eventCode || movie?.DefaultEventCode || "").trim().toUpperCase();
 }
 
 function dateCodeToIso(dateCode) {
@@ -573,6 +591,97 @@ function eventCodesFromManifest(manifest) {
   return [...eventCodes].sort();
 }
 
+async function fetchMadanapalleEventCatalog(fetchImpl) {
+  const cacheAgeMs = Date.now() - Number(eventCatalogCache.cachedAtMs || 0);
+  if (eventCatalogCache.movies.length && cacheAgeMs < EVENT_CATALOG_CACHE_MAX_AGE_MS) {
+    return {
+      movies: eventCatalogCache.movies,
+      cache: {
+        hit: true,
+        ageMs: cacheAgeMs
+      }
+    };
+  }
+
+  const url = new URL(MADANAPALLE_EVENT_SEARCH_URL);
+  url.searchParams.set("r", "MDNP");
+  url.searchParams.set("_", String(Date.now()));
+
+  const response = await fetchImpl(url, {
+    cache: "no-store",
+    headers: {
+      accept: "application/json, text/plain, */*",
+      origin: "https://boxoffice24.pages.dev",
+      referer: "https://boxoffice24.pages.dev/",
+      "user-agent":
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36"
+    }
+  });
+
+  if (!response.ok) {
+    throw new Error(`Madanapalle event catalog failed: ${response.status}`);
+  }
+
+  const payload = await response.json();
+  const movies = (payload.movies || [])
+    .map((movie) => ({
+      eventCode: eventCodeFromMovie(movie),
+      title: movie.name || movie.Title || movie.title || "",
+      slug: movie.slug || "",
+      releaseDate: movie.releaseDate || movie.EventDate || "",
+      status: movie.status || ""
+    }))
+    .filter((movie) => /^ET\d+$/i.test(movie.eventCode));
+
+  for (const seed of MADANAPALLE_SEED_EVENTS) {
+    if (!movies.some((movie) => movie.eventCode === seed.eventCode)) {
+      movies.push({
+        eventCode: seed.eventCode,
+        title: seed.title,
+        slug: "",
+        releaseDate: "",
+        status: "Seed"
+      });
+    }
+  }
+
+  eventCatalogCache.movies = movies;
+  eventCatalogCache.cachedAtMs = Date.now();
+
+  return {
+    movies,
+    cache: {
+      hit: false,
+      ageMs: 0
+    }
+  };
+}
+
+async function eventCodesFromMadanapalleCatalog(fetchImpl, notes = []) {
+  try {
+    const catalog = await fetchMadanapalleEventCatalog(fetchImpl);
+    const eventCodes = [...new Set(catalog.movies.map((movie) => movie.eventCode))].sort();
+    if (!eventCodes.length) {
+      notes.push("Madanapalle event catalog returned no current BookMyShow movies.");
+    }
+    return {
+      eventCodes,
+      catalog
+    };
+  } catch (error) {
+    notes.push(`Madanapalle event catalog failed: ${error.message}`);
+    return {
+      eventCodes: [],
+      catalog: {
+        movies: [],
+        cache: {
+          hit: false
+        }
+      }
+    };
+  }
+}
+
 function buildDiscoveryBaseline(seedBaseline, targetDate) {
   const targetDateCode = isoToDateCode(targetDate);
 
@@ -616,10 +725,15 @@ async function discoverLiveShowsForDate({
   let eventCodes = Array.isArray(providedEventCodes) ? providedEventCodes : [];
 
   if (!eventCodes.length) {
+    const catalog = await eventCodesFromMadanapalleCatalog(fetchImpl, notes);
+    eventCodes = catalog.eventCodes;
+  }
+
+  if (!eventCodes.length) {
     try {
       eventCodes = eventCodesFromManifest(await fetchDateManifest(fetchImpl, snapshotBaseUrl));
     } catch (error) {
-      notes.push(`Live discovery could not load event catalog: ${error.message}`);
+      notes.push(`Static event manifest could not load: ${error.message}`);
     }
   }
 
@@ -627,7 +741,7 @@ async function discoverLiveShowsForDate({
     eventCodes = [...new Set(seedBaseline.shows.map((show) => show.eventCode).filter(Boolean))];
   }
 
-  await Promise.all(eventCodes.map(async (eventCode) => {
+  for (const eventCode of eventCodes) {
     try {
       const { payload, meta } = await fetchMadanapalleShowtimesPayload({
         eventCode,
@@ -646,11 +760,15 @@ async function discoverLiveShowsForDate({
       successfulEventCodes.push(eventCode);
     } catch (error) {
       failedEventCodes.push(eventCode);
-      notes.push(`Live discovery failed for ${eventCode}: ${error.message}`);
     }
-  }));
+  }
 
   const baseline = buildDiscoveryBaseline(seedBaseline, targetDate);
+  if (failedEventCodes.length && snapshotsById.size === 0) {
+    notes.push(
+      `Live discovery could not fetch seat counts for ${failedEventCodes.length} catalog movies.`
+    );
+  }
   const output = buildOutputFromBaseline(baseline, Array.from(snapshotsById.values()), notes);
   const liveShowCount = output.shows.filter(
     (show) => show.source?.method === "live-proxy-discovery"
@@ -662,6 +780,7 @@ async function discoverLiveShowsForDate({
       meta: {
         ...(output.meta || {}),
         liveDiscovery: true,
+        source: "madanapalle-event-catalog",
         liveRefresh: {
           attemptedEvents: eventCodes.length,
           successfulEvents: successfulEventCodes.length,
@@ -832,6 +951,34 @@ async function buildTheatreLiveSnapshot({ date, venueCode, fetchImpl }) {
   };
 }
 
+async function buildCatalogLiveSnapshot({ date, venueCode, fetchImpl, snapshotBaseUrl }) {
+  const notes = [];
+  const { eventCodes, catalog } = await eventCodesFromMadanapalleCatalog(fetchImpl, notes);
+  const output = await discoverLiveShowsForDate({
+    fetchImpl,
+    snapshotBaseUrl,
+    targetDate: date,
+    venueCode,
+    seedBaseline: null,
+    retryRounds: 2,
+    eventCodes
+  });
+
+  return {
+    ...output,
+    meta: {
+      ...(output.meta || {}),
+      source: "madanapalle-event-catalog",
+      selectedVenueCode: venueCode || "",
+      eventCatalog: {
+        attemptedMovies: eventCodes.length,
+        cache: catalog.cache
+      },
+      notes: [...notes, ...((output.meta && output.meta.notes) || [])]
+    }
+  };
+}
+
 async function refreshLiveSnapshot(baseline, fetchImpl) {
   const notes = [];
   const baseShows = Array.isArray(baseline?.shows) ? baseline.shows : [];
@@ -919,22 +1066,43 @@ export async function buildLiveSnapshot({
       fetchImpl
     });
   } catch (error) {
-    if (venueCode) {
-      const output = buildOutputFromBaseline(buildDiscoveryBaseline(null, date), [], [
-        `BookMyShow theatre-page live discovery failed for ${venueCode}: ${error.message}`
-      ]);
+    try {
+      const output = await buildCatalogLiveSnapshot({
+        date,
+        venueCode,
+        fetchImpl,
+        snapshotBaseUrl
+      });
+
       return {
         ...output,
         meta: {
           ...(output.meta || {}),
-          source: "bookmyshow-theatre-page",
-          liveDiscovery: true,
-          selectedVenueCode: venueCode,
-          cache: {
-            hit: false
-          }
+          notes: [
+            `BookMyShow theatre-page discovery was blocked, so live counts were fetched from the Madanapalle event catalog: ${error.message}`,
+            ...((output.meta && output.meta.notes) || [])
+          ]
         }
       };
+    } catch (catalogError) {
+      if (venueCode) {
+        const output = buildOutputFromBaseline(buildDiscoveryBaseline(null, date), [], [
+          `BookMyShow theatre-page live discovery failed for ${venueCode}: ${error.message}`,
+          `Madanapalle event-catalog fallback failed: ${catalogError.message}`
+        ]);
+        return {
+          ...output,
+          meta: {
+            ...(output.meta || {}),
+            source: "bookmyshow-theatre-page",
+            liveDiscovery: true,
+            selectedVenueCode: venueCode,
+            cache: {
+              hit: false
+            }
+          }
+        };
+      }
     }
 
     baseline = null;
@@ -948,12 +1116,14 @@ export async function buildLiveSnapshot({
     }
 
     const latestBaseline = await fetchBaselineSnapshot(fetchImpl, snapshotBaseUrl, "today");
+    const catalog = await eventCodesFromMadanapalleCatalog(fetchImpl);
     const discovered = await discoverLiveShowsForDate({
       fetchImpl,
       snapshotBaseUrl,
       targetDate: date,
       venueCode,
-      seedBaseline: latestBaseline
+      seedBaseline: latestBaseline,
+      eventCodes: catalog.eventCodes
     });
 
     if (discovered.shows.length) return discovered;
@@ -1087,6 +1257,47 @@ export async function buildLiveDateManifest({
   );
   const discoveredDateEntries = [];
 
+  async function buildCatalogDateManifest(reason = "") {
+    const notes = [];
+    if (reason) notes.push(reason);
+    const { eventCodes, catalog } = await eventCodesFromMadanapalleCatalog(fetchImpl, notes);
+    const today = getIndiaTodayIso();
+    const dates = [];
+
+    for (let offset = 0; offset < days; offset += 1) {
+      const targetDate = addDaysIso(today, offset);
+      const output = await discoverLiveShowsForDate({
+        fetchImpl,
+        snapshotBaseUrl,
+        targetDate,
+        venueCode,
+        retryRounds: 1,
+        eventCodes
+      });
+
+      if (output.shows.length) {
+        dates.push(buildDateManifestEntry(output));
+      }
+    }
+
+    return {
+      version: 1,
+      generatedAt: new Date().toISOString(),
+      liveDiscovery: true,
+      source: "madanapalle-event-catalog",
+      venueCode,
+      eventCatalog: {
+        attemptedMovies: eventCodes.length,
+        cache: catalog.cache
+      },
+      dates,
+      meta: {
+        status: "ok",
+        notes
+      }
+    };
+  }
+
   try {
     if (venueCode) {
       const discoveredDates = await discoverTheatreDates({ venueCode, days });
@@ -1170,19 +1381,28 @@ export async function buildLiveDateManifest({
       dates: discoveredDateEntries
     };
   } catch (error) {
-    if (venueCode) {
-      return {
-        version: 1,
-        generatedAt: new Date().toISOString(),
-        liveDiscovery: true,
-        source: "bookmyshow-theatre-page",
-        venueCode,
-        dates: [],
-        meta: {
-          status: "error",
-          notes: [`BookMyShow theatre-page date discovery failed for ${venueCode}: ${error.message}`]
-        }
-      };
+    try {
+      return await buildCatalogDateManifest(
+        `BookMyShow theatre-page date discovery failed for ${venueCode || "all theatres"}: ${error.message}`
+      );
+    } catch (catalogError) {
+      if (venueCode) {
+        return {
+          version: 1,
+          generatedAt: new Date().toISOString(),
+          liveDiscovery: true,
+          source: "bookmyshow-theatre-page",
+          venueCode,
+          dates: [],
+          meta: {
+            status: "error",
+            notes: [
+              `BookMyShow theatre-page date discovery failed for ${venueCode}: ${error.message}`,
+              `Madanapalle event-catalog date discovery failed: ${catalogError.message}`
+            ]
+          }
+        };
+      }
     }
 
     // Fall through to the older event-code scan only for the expensive all-theatres overview.

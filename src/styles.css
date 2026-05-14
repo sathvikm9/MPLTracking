@@ -419,6 +419,65 @@ tr:last-child td {
   color: var(--ink-soft);
 }
 
+.show-card-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.show-card {
+  display: grid;
+  gap: 12px;
+  padding: 18px;
+  border-radius: 22px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.78);
+}
+
+.show-card h3,
+.show-card p {
+  margin: 0;
+}
+
+.show-card__time {
+  width: fit-content;
+  padding: 8px 11px;
+  border-radius: 999px;
+  background: rgba(15, 118, 110, 0.12);
+  color: var(--teal);
+  font-family: "Space Grotesk", sans-serif;
+  font-weight: 700;
+}
+
+.show-card__numbers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.show-card__numbers strong,
+.show-card__numbers span {
+  padding: 10px 12px;
+  border-radius: 14px;
+  font-family: "Space Grotesk", sans-serif;
+}
+
+.show-card__numbers strong {
+  background: rgba(255, 107, 44, 0.13);
+  color: var(--warm);
+}
+
+.show-card__numbers span {
+  background: rgba(22, 21, 20, 0.07);
+}
+
+.show-card__meta {
+  font-size: 0.92rem;
+  line-height: 1.55;
+  color: var(--ink-soft);
+}
+
 .movie-cluster-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -541,6 +600,7 @@ tr:last-child td {
   .hero,
   .stats-grid,
   .caveat-grid,
+  .show-card-grid,
   .movie-cluster-grid {
     grid-template-columns: 1fr;
   }

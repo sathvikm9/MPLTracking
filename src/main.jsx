@@ -22,11 +22,6 @@ const THEATRE_OPTIONS = [
   { value: "SKMD", label: "Sri Krishna" }
 ];
 const THEATRE_BY_CODE = new Map(THEATRE_OPTIONS.map((option) => [option.value, option.label]));
-const DEFAULT_MOVIE_TRACKING = {
-  eventCode: "ET00455003",
-  movieName: "Veerabhadrudu (NA | NA)",
-  date: "2026-05-14"
-};
 
 function currency(value) {
   return new Intl.NumberFormat("en-IN", {
@@ -69,6 +64,18 @@ function showGross(show) {
     (sum, category) => sum + Number(category.soldSeats || 0) * netTicketPrice(category.price),
     0
   );
+}
+
+function categoryBreakdown(show) {
+  const categories = Array.isArray(show.categories) ? show.categories : [];
+  const parts = categories
+    .filter((category) => Number(category.totalSeats || 0) > 0 || Number(category.soldSeats || 0) > 0)
+    .map((category) => {
+      const price = Number(category.price || 0);
+      return `${number(category.soldSeats)} x ₹${netTicketPrice(price)} (${price ? `₹${price} ticket` : category.label})`;
+    });
+
+  return parts.length ? parts.join(" + ") : "Seat-category split unavailable";
 }
 
 async function fetchJson(url) {
@@ -335,7 +342,7 @@ function getInitialSelectedDate() {
     return urlDate;
   }
 
-  return DEFAULT_MOVIE_TRACKING.date;
+  return getIndiaTodayIso();
 }
 
 function getInitialSelectedTheatre() {
@@ -364,6 +371,9 @@ function syncSelectionToUrl(selectedDate, selectedTheatre, movieTracking) {
   if (movieTracking?.eventCode) {
     url.searchParams.set("eventCode", movieTracking.eventCode);
     url.searchParams.set("moviename", movieTracking.movieName || "");
+  } else {
+    url.searchParams.delete("eventCode");
+    url.searchParams.delete("moviename");
   }
 
   window.history.replaceState({}, "", `${url.pathname}?${url.searchParams.toString()}${url.hash}`);
@@ -475,16 +485,18 @@ function movieNameFromSearchParam(value) {
 }
 
 function getInitialMovieTracking() {
-  if (typeof window === "undefined") return DEFAULT_MOVIE_TRACKING;
+  if (typeof window === "undefined") return null;
 
   const params = new URLSearchParams(window.location.search);
-  const eventCode = params.get("eventCode") || DEFAULT_MOVIE_TRACKING.eventCode;
-  const movieName = movieNameFromSearchParam(params.get("moviename")) || DEFAULT_MOVIE_TRACKING.movieName;
+  const eventCode = params.get("eventCode");
+  if (!/^ET\d+$/i.test(eventCode || "")) return null;
+
+  const movieName = movieNameFromSearchParam(params.get("moviename")) || eventCode;
 
   return {
-    eventCode,
+    eventCode: eventCode.toUpperCase(),
     movieName,
-    date: params.get("date") || DEFAULT_MOVIE_TRACKING.date
+    date: params.get("date") || getIndiaTodayIso()
   };
 }
 
@@ -608,7 +620,11 @@ function dashboardCacheKey(selectedDate, selectedTheatre) {
 }
 
 function hasLiveSeatCounts(data) {
-  return (data?.shows || []).some((show) => show.source?.method === "live-proxy-showtimes");
+  return (data?.shows || []).some((show) =>
+    ["live-proxy-showtimes", "live-proxy-discovery", "movie-event-showtimes"].includes(
+      show.source?.method
+    )
+  );
 }
 
 function isLiveCountFailure(data) {
@@ -1078,11 +1094,41 @@ function MovieWiseBoard({ shows, emptyMessage }) {
                   {movieLabelFromShow(show)} {ticketLabel(show.soldSeats)}
                 </p>
                 <p className="movie-line__meta">
-                  {number(show.availableSeats)} available · {number(show.totalSeats)} total
+                  {number(show.availableSeats)} available · {number(show.totalSeats)} total ·{" "}
+                  {currency(showGross(show))} gross
                 </p>
+                <p className="movie-line__meta">{categoryBreakdown(show)}</p>
               </div>
             ))}
           </div>
+        </article>
+      ))}
+    </div>
+  );
+}
+
+function ShowCards({ shows, emptyMessage }) {
+  if (!shows.length) {
+    return <div className="empty-state">{emptyMessage}</div>;
+  }
+
+  return (
+    <div className="show-card-grid">
+      {shows.map((show) => (
+        <article className="show-card" key={show.id}>
+          <div>
+            <p className="show-card__time">{show.showTimeLabel}</p>
+            <h3>{movieLabelFromShow(show)}</h3>
+            <p>{show.theatreShortName}</p>
+          </div>
+          <div className="show-card__numbers">
+            <strong>{ticketLabel(show.soldSeats)}</strong>
+            <span>{currency(showGross(show))}</span>
+          </div>
+          <p className="show-card__meta">{categoryBreakdown(show)}</p>
+          <p className="show-card__meta">
+            {number(show.availableSeats)} available · {percent(show.occupancyPercent)} occupancy
+          </p>
         </article>
       ))}
     </div>
@@ -1178,14 +1224,17 @@ function App() {
     : isLiveProxy
       ? data.meta?.cache?.hit
         ? "BookMyShow live discovery was blocked temporarily, so this view is using the last successful theatre-page result with a timestamp."
-        : "Each date selection, theatre selection, and refresh asks the live proxy for current BookMyShow theatre-page shows and seat counts."
+        : "Every theatre/date change and refresh asks the live proxy for current Madanapalle BookMyShow shows and seat counts."
       : "Browser refresh only reloads the latest published JSON. On GitHub Pages, new numbers appear after the collector runs and a fresh deploy is published.";
   const selectedTheatreLabel =
     THEATRE_OPTIONS.find((option) => option.value === selectedTheatre)?.label || "All Theatres";
   const availableDateCount = dateOptions.length;
   const hasDiscoveryOnlyShows =
     filteredShows.length > 0 &&
-    filteredShows.every((show) => show.source?.method === "bookmyshow-showtime-discovery");
+    filteredShows.every((show) =>
+      ["bookmyshow-showtime-discovery", "bookmyshow-theatre-page"].includes(show.source?.method)
+    ) &&
+    summary.totalCapacity === 0;
   const liveRefresh = data.meta?.liveRefresh;
   const liveRetryFailed =
     isLiveProxy && hasDiscoveryOnlyShows && Number(liveRefresh?.failedEvents || 0) > 0;
@@ -1204,11 +1253,10 @@ function App() {
       <section className="hero">
         <div className="hero__content">
           <p className="hero__eyebrow">Madanapalle Live Tracker</p>
-          <h1>City-wide BookMyShow tracking built for Madanapalle.</h1>
+          <h1>Live theatre-wise BookMyShow ticket tracking.</h1>
           <p className="hero__lede">
-            Dates are now generated from actual Madanapalle booking snapshots. Pick a theatre to
-            see only the dates where that theatre has BookMyShow shows, then refresh for live
-            booked-ticket counts.
+            Select a theatre, choose one of its live available booking dates, and see the current
+            movie-wise show count, booked tickets, occupancy, and net gross.
           </p>
 
           <div className="selector-shell">
@@ -1221,7 +1269,7 @@ function App() {
             ) : null}
 
             <label className="selector-select-shell">
-              <span className="selector-select__label">Theatre</span>
+              <span className="selector-select__label">1. Select theatre</span>
               <select
                 className="selector-select"
                 value={selectedTheatre}
@@ -1236,7 +1284,7 @@ function App() {
             </label>
 
             <div className="date-selector-block">
-              <p className="selector-select__label">Available booking dates</p>
+              <p className="selector-select__label">2. Select available date</p>
               <div className="date-strip" aria-label="Date selection">
                 {datesLoading ? <div className="date-strip__empty">Loading booking dates...</div> : null}
                 {!datesLoading && datesError ? (
@@ -1317,10 +1365,10 @@ function App() {
           caption={`${number(summary.totalAvailable)} seats still available`}
           tone="amber"
         />
-        <StatCard
+          <StatCard
           eyebrow="Gross"
           value={currency(summary.totalGross)}
-          caption={`${number(summary.totalShows)} shows in the current selection`}
+          caption={`${number(summary.totalShows)} live shows using ₹105→₹100 and ₹84→₹79`}
           tone="ink"
         />
         <StatCard
@@ -1331,8 +1379,16 @@ function App() {
       </section>
 
       <Section
-        title="Movie-wise Ticket Lines"
-        kicker="Every show in theatre, time, movie, tickets format"
+        title="Live Shows"
+        kicker="Only shows currently visible in BookMyShow/mirror data"
+        aside={<span className="section__hint">{filteredShows.length} show lines</span>}
+      >
+        <ShowCards shows={filteredShows} emptyMessage={emptyMessage} />
+      </Section>
+
+      <Section
+        title="Movie-wise Lines"
+        kicker="Theatre, time, movie, tickets format"
         aside={<span className="section__hint">{filteredShows.length} show lines</span>}
       >
         <MovieWiseBoard shows={filteredShows} emptyMessage={emptyMessage} />
@@ -1487,32 +1543,6 @@ function App() {
           rows={filteredShows}
           emptyMessage={emptyMessage}
         />
-      </Section>
-
-      <Section title="Collector Caveats" kicker="What this version assumes">
-        <div className="caveat-grid">
-          <article className="caveat-card">
-            <h3>Static-first architecture</h3>
-            <p>
-              This app reads from generated JSON files so it can be published on GitHub Pages
-              without a full custom backend.
-            </p>
-          </article>
-          <article className="caveat-card">
-            <h3>Live category payload</h3>
-            <p>
-              The tracker prefers live `MaxSeats` and `SeatsAvail` counts when BookMyShow exposes
-              them, and falls back to showtime discovery when future dates only publish schedule data.
-            </p>
-          </article>
-          <article className="caveat-card">
-            <h3>Cutoff handling</h3>
-            <p>
-              We prefer BookMyShow&apos;s live cutoff when present, and fall back to theatre-specific
-              cutoff rules when it is missing.
-            </p>
-          </article>
-        </div>
       </Section>
 
       <Notes notes={data.meta?.notes} />
