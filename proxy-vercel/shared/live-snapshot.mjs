@@ -1157,6 +1157,7 @@ export async function buildLiveSnapshot({
   const url = new URL(requestUrl);
   const date = url.searchParams.get("date") || getIndiaTodayIso();
   const venueCode = url.searchParams.get("venueCode");
+  const strictLiveOnly = url.searchParams.get("strict") === "1";
   let baseline;
 
   try {
@@ -1185,6 +1186,12 @@ export async function buildLiveSnapshot({
         }
       };
     } catch (catalogError) {
+      if (strictLiveOnly) {
+        throw new Error(
+          `BookMyShow theatre-page live discovery failed: ${error.message}; live mirror fallback failed: ${catalogError.message}`
+        );
+      }
+
       if (venueCode) {
         const output = buildOutputFromBaseline(buildDiscoveryBaseline(null, date), [], [
           `BookMyShow theatre-page live discovery failed for ${venueCode}: ${error.message}`,
@@ -1206,6 +1213,10 @@ export async function buildLiveSnapshot({
     }
 
     baseline = null;
+  }
+
+  if (strictLiveOnly) {
+    throw new Error("Live BookMyShow data is unavailable for this selection.");
   }
 
   try {

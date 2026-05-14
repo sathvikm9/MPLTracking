@@ -59,7 +59,7 @@ function buildOpenApiSpec(req) {
           tags: ["Live tracking"],
           summary: "Get available booking dates",
           description:
-            "Returns available booking dates for all active Madanapalle theatres or one selected theatre. This is the endpoint the date strip should use.",
+            "Optional helper for available booking dates. The current website uses a normal calendar and calls /api/live directly for the selected theatre/date.",
           parameters: [
             {
               name: "venueCode",
@@ -116,7 +116,7 @@ function buildOpenApiSpec(req) {
           tags: ["Live tracking"],
           summary: "Get live sold-ticket snapshot for a date",
           description:
-            "Returns only shows visible for the selected date/theatre according to the live proxy path. Gross uses net ticket price: 105 -> 100 and 84 -> 79.",
+            "Returns shows and live sold-ticket counts for the selected date/theatre. Gross uses net ticket price: 105 -> 100 and 84 -> 79. Add strict=1 when you want live theatre-page or live mirror data only, with no static snapshot fallback.",
           parameters: [
             {
               name: "date",
@@ -140,6 +140,18 @@ function buildOpenApiSpec(req) {
                 enum: ["RTDM", "ASRM", "MSDR", "SKMD"]
               },
               example: "RTDM"
+            },
+            {
+              name: "strict",
+              in: "query",
+              required: false,
+              description:
+                "Set to 1 for the calendar UI flow. This permits live mirror fallback if theatre-page discovery is blocked, but prevents old/static fallback data.",
+              schema: {
+                type: "string",
+                enum: ["1"]
+              },
+              example: "1"
             },
             {
               name: "_",

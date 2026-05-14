@@ -4,6 +4,7 @@ import ReactDOM from "react-dom/client";
 import "./styles.css";
 
 const INDIA_TIMEZONE = "Asia/Kolkata";
+const SERVER_ERROR_MESSAGE = "Server is not responding, please try again later.";
 const LAST_GOOD_DASHBOARD_CACHE_PREFIX = "mpltracking:last-good-live";
 const LAST_GOOD_DASHBOARD_CACHE_MAX_AGE_MS = 1000 * 60 * 60 * 6;
 const CITY_INFO = {
@@ -15,11 +16,11 @@ const CITY_INFO = {
   state: "Andhra Pradesh"
 };
 const THEATRE_OPTIONS = [
-  { value: "ALL", label: "All Theatres" },
-  { value: "ASRM", label: "ASR" },
   { value: "RTDM", label: "Ravi" },
+  { value: "SKMD", label: "Sri Krishna" },
   { value: "MSDR", label: "Siddartha" },
-  { value: "SKMD", label: "Sri Krishna" }
+  { value: "ASRM", label: "ASR" },
+  { value: "ALL", label: "All Theatres" }
 ];
 const THEATRE_BY_CODE = new Map(THEATRE_OPTIONS.map((option) => [option.value, option.label]));
 
@@ -338,7 +339,7 @@ function getInitialSelectedDate() {
   if (typeof window === "undefined") return getIndiaTodayIso();
 
   const urlDate = new URLSearchParams(window.location.search).get("date");
-  if (/^\d{4}-\d{2}-\d{2}$/.test(urlDate || "") && !isPastIndiaDate(urlDate)) {
+  if (/^\d{4}-\d{2}-\d{2}$/.test(urlDate || "")) {
     return urlDate;
   }
 
@@ -621,9 +622,9 @@ function dashboardCacheKey(selectedDate, selectedTheatre) {
 
 function hasLiveSeatCounts(data) {
   return (data?.shows || []).some((show) =>
-    ["live-proxy-showtimes", "live-proxy-discovery", "movie-event-showtimes"].includes(
+    ["bookmyshow-theatre-page", "live-proxy-showtimes", "live-proxy-discovery", "movie-event-showtimes"].includes(
       show.source?.method
-    )
+    ) && Number(show.totalSeats || 0) > 0
   );
 }
 
@@ -631,9 +632,14 @@ function isLiveCountFailure(data) {
   const liveRefresh = data?.meta?.liveRefresh || {};
   const shows = data?.shows || [];
   return (
-    shows.length > 0 &&
+    data?.meta?.status === "error" ||
+    (
     Number(liveRefresh.failedEvents || 0) > 0 &&
-    Number(liveRefresh.liveShowCount || 0) === 0
+      Number(liveRefresh.attemptedEvents || 0) > 0 &&
+      Number(liveRefresh.failedEvents || 0) >= Number(liveRefresh.attemptedEvents || 0) &&
+      Number(liveRefresh.liveShowCount || 0) === 0 &&
+      !shows.some((show) => Number(show.totalSeats || 0) > 0)
+    )
   );
 }
 
@@ -757,7 +763,7 @@ function useDateAvailability(selectedTheatre) {
   return state;
 }
 
-function useDashboardData(selectedDate, selectedTheatre, movieTracking) {
+function useDashboardData(selectedDate, selectedTheatre) {
   const [state, setState] = React.useState({
     loading: true,
     error: null,
@@ -768,165 +774,38 @@ function useDashboardData(selectedDate, selectedTheatre, movieTracking) {
   const loadDashboard = React.useCallback(async () => {
     const config = await loadRuntimeConfig();
     const liveApiBase = normalizeLiveApiBase(config);
-    const indiaToday = getIndiaTodayIso();
-    const proxyDateParam = selectedDate;
-    const staticPath =
-      selectedDate === indiaToday
-        ? `./data/latest.json?ts=${Date.now()}`
-        : `./data/history/${selectedDate}.json?ts=${Date.now()}`;
-
-    if (liveApiBase) {
-      try {
-        if (movieTracking?.eventCode) {
-          const movieUrl = new URL(`${liveApiBase}/api/madanapalle-showtimes`);
-          movieUrl.searchParams.set("eventCode", movieTracking.eventCode);
-          movieUrl.searchParams.set("date", selectedDate);
-          movieUrl.searchParams.set("ts", String(Date.now()));
-
-          if (selectedTheatre !== "ALL") {
-            movieUrl.searchParams.set("venueCode", selectedTheatre);
-          }
-
-          const moviePayload = await fetchJson(movieUrl.toString());
-          return {
-            ok: true,
-            data: annotateClientSource(
-              normalizeMovieShowtimePayload({
-                payload: moviePayload.payload,
-                meta: moviePayload,
-                selectedDate,
-                movieName: movieTracking.movieName
-              }),
-              {
-                mode: "movie-event-showtimes",
-                liveApiBase,
-                selectedDate,
-                selectedTheatre
-              }
-            )
-          };
-        }
-
-        const liveUrl = new URL(`${liveApiBase}/api/live`);
-        liveUrl.searchParams.set("date", proxyDateParam);
-        liveUrl.searchParams.set("ts", String(Date.now()));
-
-        if (selectedTheatre !== "ALL") {
-          liveUrl.searchParams.set("venueCode", selectedTheatre);
-        }
-
-        const liveData = await fetchJson(liveUrl.toString());
-        if (liveData.targetDate !== selectedDate) {
-          throw new Error(
-            `Live proxy returned ${liveData.targetDate || "unknown date"} for ${selectedDate}`
-          );
-        }
-
-        if (hasLiveSeatCounts(liveData)) {
-          writeLastGoodDashboard(selectedDate, selectedTheatre, liveData);
-        } else if (isLiveCountFailure(liveData)) {
-          const cachedLiveData = readLastGoodDashboard(selectedDate, selectedTheatre);
-          if (cachedLiveData) {
-            return {
-              ok: true,
-              data: annotateClientSource(cachedLiveData, {
-                mode: "live-proxy",
-                liveApiBase,
-                selectedDate,
-                selectedTheatre,
-                fallbackReason: "Current mirror refresh failed; using browser last-good live data."
-              })
-            };
-          }
-        }
-
-        return {
-          ok: true,
-          data: annotateClientSource(liveData, {
-            mode: "live-proxy",
-            liveApiBase,
-            selectedDate,
-            selectedTheatre
-          })
-        };
-      } catch (error) {
-        try {
-          const snapshot = await fetchJson(staticPath);
-          const fallback = annotateClientSource(snapshot, {
-            mode: "published-snapshot",
-            liveApiBase,
-            selectedDate,
-            selectedTheatre,
-            fallbackReason: error.message
-          });
-
-          return {
-            ok: true,
-            data: {
-              ...fallback,
-              meta: {
-                ...(fallback.meta || {}),
-                notes: [
-                  `Live proxy fallback: ${error.message}`,
-                  ...((fallback.meta && fallback.meta.notes) || [])
-                ]
-              }
-            }
-          };
-        } catch (snapshotError) {
-          return {
-            ok: true,
-            data: annotateClientSource(
-              buildEmptyDataset(selectedDate, [
-                `No shows were found for ${selectedDate}.`,
-                "The selected date does not have a published snapshot yet."
-              ]),
-              {
-                mode: "live-proxy",
-                liveApiBase,
-                selectedDate,
-                selectedTheatre,
-                fallbackReason: error.message
-              }
-            )
-          };
-        }
-      }
+    if (!liveApiBase) {
+      throw new Error(SERVER_ERROR_MESSAGE);
     }
 
-    try {
-      const snapshot = await fetchJson(staticPath);
-      return {
-        ok: true,
-        data: annotateClientSource(snapshot, {
-          mode: "published-snapshot",
-          liveApiBase: "",
-          selectedDate,
-          selectedTheatre
-        })
-      };
-    } catch (error) {
-      if (error.status === 404) {
-        return {
-          ok: true,
-          data: annotateClientSource(
-            buildEmptyDataset(selectedDate, [
-              `No shows were found for ${selectedDate}.`,
-              "The selected date does not have a published snapshot yet."
-            ]),
-            {
-            mode: "published-snapshot",
-            liveApiBase: "",
-            selectedDate,
-            selectedTheatre
-          }
-        )
-        };
-      }
+    const liveUrl = new URL(`${liveApiBase}/api/live`);
+    liveUrl.searchParams.set("date", selectedDate);
+    liveUrl.searchParams.set("strict", "1");
+    liveUrl.searchParams.set("ts", String(Date.now()));
 
-      throw error;
+    if (selectedTheatre !== "ALL") {
+      liveUrl.searchParams.set("venueCode", selectedTheatre);
     }
-  }, [selectedDate, selectedTheatre, movieTracking?.eventCode, movieTracking?.movieName]);
+
+    const liveData = await fetchJson(liveUrl.toString());
+    if (liveData.targetDate !== selectedDate) {
+      throw new Error(SERVER_ERROR_MESSAGE);
+    }
+
+    if (isLiveCountFailure(liveData)) {
+      throw new Error(SERVER_ERROR_MESSAGE);
+    }
+
+    return {
+      ok: true,
+      data: annotateClientSource(liveData, {
+        mode: "live-proxy",
+        liveApiBase,
+        selectedDate,
+        selectedTheatre
+      })
+    };
+  }, [selectedDate, selectedTheatre]);
 
   const loadData = React.useCallback(
     (mode = "initial") => {
@@ -986,10 +865,10 @@ function useDashboardData(selectedDate, selectedTheatre, movieTracking) {
         }
 
         return {
-          ...current,
           loading: false,
           refreshing: false,
-          error: result.error
+          error: result.error,
+          data: null
         };
       });
     });
@@ -1138,70 +1017,16 @@ function ShowCards({ shows, emptyMessage }) {
 function App() {
   const [selectedDate, setSelectedDate] = React.useState(getInitialSelectedDate);
   const [selectedTheatre, setSelectedTheatre] = React.useState(getInitialSelectedTheatre);
-  const [movieTracking] = React.useState(getInitialMovieTracking);
-  const {
-    loading: datesLoading,
-    error: datesError,
-    notes: dateNotes,
-    dateOptions: liveDateOptions
-  } = useDateAvailability(selectedTheatre);
-  const { loading, error, data, refreshing, refresh } = useDashboardData(
-    selectedDate,
-    selectedTheatre,
-    movieTracking
-  );
-  const movieModeShowCount = data?.summary?.totalShows || 0;
-  const dateOptions = movieTracking?.eventCode
-    ? [
-        buildDateOption({
-          date: selectedDate,
-          totalShows: movieModeShowCount,
-          theatreCounts: {
-            [selectedTheatre]: {
-              totalShows: movieModeShowCount
-            }
-          }
-        })
-      ]
-    : liveDateOptions;
+  const { loading, error, data, refreshing, refresh } = useDashboardData(selectedDate, selectedTheatre);
 
   React.useEffect(() => {
-    if (movieTracking?.eventCode || datesLoading || !dateOptions.length) return;
-    if (isSupportedDate(selectedDate, dateOptions)) return;
+    syncSelectionToUrl(selectedDate, selectedTheatre, null);
+  }, [selectedDate, selectedTheatre]);
 
-    setSelectedDate(pickPreferredDate(dateOptions));
-  }, [dateOptions, datesLoading, movieTracking?.eventCode, selectedDate]);
-
-  React.useEffect(() => {
-    syncSelectionToUrl(selectedDate, selectedTheatre, movieTracking);
-  }, [selectedDate, selectedTheatre, movieTracking]);
-
-  if (loading) {
-    return (
-      <main className="app-shell">
-        <div className="hero">
-          <p className="hero__eyebrow">Madanapalle Live Tracker</p>
-          <h1>Loading the latest snapshot.</h1>
-        </div>
-      </main>
-    );
-  }
-
-  if (error || !data) {
-    return (
-      <main className="app-shell">
-        <div className="hero">
-          <p className="hero__eyebrow">Madanapalle Live Tracker</p>
-          <h1>Dashboard unavailable.</h1>
-          <p className="hero__lede">
-            {error?.message || "No data was found. Run the collector first."}
-          </p>
-        </div>
-      </main>
-    );
-  }
-
-  const allShows = [...(data.shows || [])].sort(compareShows);
+  const selectedTheatreLabel =
+    THEATRE_OPTIONS.find((option) => option.value === selectedTheatre)?.label || "All Theatres";
+  const safeData = error || !data ? buildEmptyDataset(selectedDate) : data;
+  const allShows = [...(safeData.shows || [])].sort(compareShows);
   const filteredShows =
     selectedTheatre === "ALL"
       ? allShows
@@ -1209,65 +1034,37 @@ function App() {
   const summary = buildSummaryFromShows(filteredShows);
   const movies = summarizeMoviesFromShows(filteredShows);
   const theatres = summarizeTheatresFromShows(filteredShows);
-  const generatedLabel = formatGeneratedAt(data);
-  const ageLabel = snapshotAgeLabel(data.generatedAt);
-  const clientSource = data.meta?.clientSource || {};
-  const isLiveProxy = clientSource.mode === "live-proxy";
-  const isMovieTracking = clientSource.mode === "movie-event-showtimes";
-  const refreshButtonLabel = refreshing
-    ? "Refreshing..."
-    : isLiveProxy || isMovieTracking
-      ? "Refresh live data"
-      : "Check for newer snapshot";
-  const sourceNote = isMovieTracking
-    ? "Movie tracking mode asks the live Madanapalle showtime mirror for this event code, date, and city on every refresh."
-    : isLiveProxy
-      ? data.meta?.cache?.hit
-        ? "BookMyShow live discovery was blocked temporarily, so this view is using the last successful theatre-page result with a timestamp."
-        : "Every theatre/date change and refresh asks the live proxy for current Madanapalle BookMyShow shows and seat counts."
-      : "Browser refresh only reloads the latest published JSON. On GitHub Pages, new numbers appear after the collector runs and a fresh deploy is published.";
-  const selectedTheatreLabel =
-    THEATRE_OPTIONS.find((option) => option.value === selectedTheatre)?.label || "All Theatres";
-  const availableDateCount = dateOptions.length;
-  const hasDiscoveryOnlyShows =
-    filteredShows.length > 0 &&
-    filteredShows.every((show) =>
-      ["bookmyshow-showtime-discovery", "bookmyshow-theatre-page"].includes(show.source?.method)
-    ) &&
-    summary.totalCapacity === 0;
-  const liveRefresh = data.meta?.liveRefresh;
-  const liveRetryFailed =
-    isLiveProxy && hasDiscoveryOnlyShows && Number(liveRefresh?.failedEvents || 0) > 0;
-  const discoveryOnlyMessage = liveRetryFailed
-    ? "Live BookMyShow count retry failed for this selection, so showtimes are being shown without seat counts. Click Refresh live data to try the live mirrors again."
-    : isPastIndiaDate(selectedDate)
-      ? "This is now a past BookMyShow India date, so live seat counts are no longer exposed. The page is showing the saved snapshot/showtimes for that date."
-      : "Showtimes are available for this date, but BookMyShow has not exposed live seat counts through the category payload yet.";
-  const emptyMessage =
-    selectedTheatre === "ALL"
-      ? `No shows found for ${formatSelectedDateLabel(selectedDate)}.`
-      : `No shows found for ${selectedTheatreLabel} on ${formatSelectedDateLabel(selectedDate)}.`;
+  const generatedLabel = data ? formatGeneratedAt(data) : "Not loaded yet";
+  const ageLabel = data ? snapshotAgeLabel(data.generatedAt) : "Waiting for live API";
+  const isBusy = loading || refreshing;
+  const statusMessage = loading
+    ? `Fetching live data for ${selectedTheatreLabel} on ${formatSelectedDateLabel(selectedDate)}...`
+    : refreshing
+      ? "Refreshing live data..."
+      : error
+        ? SERVER_ERROR_MESSAGE
+        : !filteredShows.length
+          ? "No Shows Available for selected date"
+          : `${number(filteredShows.length)} live show lines loaded.`;
+  const emptyMessage = error
+    ? SERVER_ERROR_MESSAGE
+    : isBusy
+      ? "Fetching live data..."
+      : "No Shows Available for selected date";
 
   return (
     <main className="app-shell">
       <section className="hero">
         <div className="hero__content">
           <p className="hero__eyebrow">Madanapalle Live Tracker</p>
-          <h1>Live theatre-wise BookMyShow ticket tracking.</h1>
+          <h1>Pick a theatre. Pick a date. Get live tickets.</h1>
           <p className="hero__lede">
-            Select a theatre, choose one of its live available booking dates, and see the current
-            movie-wise show count, booked tickets, occupancy, and net gross.
+            This page checks only the selected theatre and date. If BookMyShow has visible shows, it
+            displays movie names, show timings, booked tickets, occupancy, and net gross using
+            ₹105→₹100 and ₹84→₹79.
           </p>
 
           <div className="selector-shell">
-            {movieTracking?.eventCode ? (
-              <div className="movie-tracking-panel">
-                <p className="selector-select__label">Movie</p>
-                <strong>{movieTracking.movieName}</strong>
-                <span>Event code: {movieTracking.eventCode} · Default city: Madanapalle</span>
-              </div>
-            ) : null}
-
             <label className="selector-select-shell">
               <span className="selector-select__label">1. Select theatre</span>
               <select
@@ -1283,48 +1080,35 @@ function App() {
               </select>
             </label>
 
-            <div className="date-selector-block">
-              <p className="selector-select__label">2. Select available date</p>
-              <div className="date-strip" aria-label="Date selection">
-                {datesLoading ? <div className="date-strip__empty">Loading booking dates...</div> : null}
-                {!datesLoading && datesError ? (
-                  <div className="date-strip__empty">Could not load booking dates.</div>
-                ) : null}
-                {!datesLoading && !datesError && !dateOptions.length ? (
-                  <div className="date-strip__empty">
-                    {dateNotes?.[0] || `No booking dates found for ${selectedTheatreLabel}.`}
-                  </div>
-                ) : null}
-                {!datesLoading && !datesError
-                  ? dateOptions.map((option) => (
-                      <button
-                        key={option.value}
-                        className={`date-chip${selectedDate === option.value ? " date-chip--active" : ""}`}
-                        onClick={() => setSelectedDate(option.value)}
-                        type="button"
-                      >
-                        <span className="date-chip__weekday">{option.weekday}</span>
-                        <strong className="date-chip__day">{option.day}</strong>
-                        <span className="date-chip__month">{option.month}</span>
-                        <span className="date-chip__shows">
-                          {dateShowLabel(option, selectedTheatre)}
-                        </span>
-                      </button>
-                    ))
-                  : null}
-              </div>
-            </div>
+            <label className="selector-select-shell selector-select-shell--date">
+              <span className="selector-select__label">2. Select date</span>
+              <input
+                className="date-input"
+                type="date"
+                value={selectedDate}
+                onChange={(event) => setSelectedDate(event.target.value || getIndiaTodayIso())}
+              />
+            </label>
           </div>
 
-          {hasDiscoveryOnlyShows ? (
-            <div className="live-status-note">{discoveryOnlyMessage}</div>
-          ) : null}
+          <div
+            className={`status-panel${
+              error ? " status-panel--error" : isBusy ? " status-panel--loading" : ""
+            }`}
+          >
+            {isBusy ? <span className="status-spinner" aria-hidden="true" /> : null}
+            <span>{statusMessage}</span>
+          </div>
 
           <div className="hero__actions">
-            <button className="refresh-button" onClick={refresh} disabled={refreshing}>
-              {refreshButtonLabel}
+            <button className="refresh-button" onClick={refresh} disabled={isBusy}>
+              {isBusy ? <span className="button-spinner" aria-hidden="true" /> : null}
+              {refreshing ? "Refreshing live data..." : "Refresh live data"}
             </button>
-            <p className="hero__note">{sourceNote}</p>
+            <p className="hero__note">
+              Every selection and refresh calls the live API again. If the server or BookMyShow mirror
+              fails, this page shows a server error instead of old data.
+            </p>
           </div>
         </div>
 
@@ -1336,18 +1120,17 @@ function App() {
           <div className="meta-pill">
             <span>Theatre Filter</span>
             <strong>{selectedTheatreLabel}</strong>
-            <small>{number(availableDateCount)} booking dates</small>
+            <small>{selectedTheatre === "ALL" ? "All active Madanapalle theatres" : "Single theatre"}</small>
           </div>
           <div className="meta-pill">
-            <span>Snapshot Generated</span>
+            <span>Last Checked</span>
             <strong>{generatedLabel}</strong>
             <small>{ageLabel}</small>
           </div>
           <div className="meta-pill">
-            <span>Source Mode</span>
-            <strong>
-              {isMovieTracking ? "Movie Event Live" : isLiveProxy ? "Live Proxy" : "Published Snapshot"}
-            </strong>
+            <span>Live Shows</span>
+            <strong>{number(filteredShows.length)}</strong>
+            <small>{movies.length ? `${number(movies.length)} movies` : "No movie rows yet"}</small>
           </div>
         </div>
       </section>
@@ -1380,7 +1163,7 @@ function App() {
 
       <Section
         title="Live Shows"
-        kicker="Only shows currently visible in BookMyShow/mirror data"
+        kicker="Selected theatre/date result"
         aside={<span className="section__hint">{filteredShows.length} show lines</span>}
       >
         <ShowCards shows={filteredShows} emptyMessage={emptyMessage} />
@@ -1544,8 +1327,6 @@ function App() {
           emptyMessage={emptyMessage}
         />
       </Section>
-
-      <Notes notes={data.meta?.notes} />
     </main>
   );
 }
