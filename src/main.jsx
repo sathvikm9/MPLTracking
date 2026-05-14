@@ -21,6 +21,12 @@ const THEATRE_OPTIONS = [
   { value: "MSDR", label: "Siddartha" },
   { value: "SKMD", label: "Sri Krishna" }
 ];
+const THEATRE_BY_CODE = new Map(THEATRE_OPTIONS.map((option) => [option.value, option.label]));
+const DEFAULT_MOVIE_TRACKING = {
+  eventCode: "ET00455003",
+  movieName: "Veerabhadrudu (NA | NA)",
+  date: "2026-05-14"
+};
 
 function currency(value) {
   return new Intl.NumberFormat("en-IN", {
@@ -45,6 +51,14 @@ function ticketLabel(value) {
 
 function netTicketPrice(price) {
   return Math.max(Number(price || 0) - 5, 0);
+}
+
+function toNumber(value) {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (value === null || value === undefined || value === "") return 0;
+
+  const parsed = Number(String(value).replace(/[^\d.-]/g, ""));
+  return Number.isFinite(parsed) ? parsed : 0;
 }
 
 function showGross(show) {
@@ -206,6 +220,25 @@ function buildEmptyDataset(targetDate, notes = []) {
   };
 }
 
+function isoToDateCode(date) {
+  return String(date || "").replaceAll("-", "");
+}
+
+function dateCodeToIso(dateCode) {
+  const value = String(dateCode || "");
+  if (!/^\d{8}$/.test(value)) return "";
+  return `${value.slice(0, 4)}-${value.slice(4, 6)}-${value.slice(6, 8)}`;
+}
+
+function showDateTimeToIso(value) {
+  const code = String(value || "");
+  if (!/^\d{12}$/.test(code)) return "";
+  return `${code.slice(0, 4)}-${code.slice(4, 6)}-${code.slice(6, 8)}T${code.slice(
+    8,
+    10
+  )}:${code.slice(10, 12)}:00+05:30`;
+}
+
 function getIndiaTodayIso() {
   return new Intl.DateTimeFormat("en-CA", {
     timeZone: INDIA_TIMEZONE,
@@ -302,7 +335,7 @@ function getInitialSelectedDate() {
     return urlDate;
   }
 
-  return getIndiaTodayIso();
+  return DEFAULT_MOVIE_TRACKING.date;
 }
 
 function getInitialSelectedTheatre() {
@@ -316,7 +349,7 @@ function getInitialSelectedTheatre() {
   return "ALL";
 }
 
-function syncSelectionToUrl(selectedDate, selectedTheatre) {
+function syncSelectionToUrl(selectedDate, selectedTheatre, movieTracking) {
   if (typeof window === "undefined") return;
 
   const url = new URL(window.location.href);
@@ -326,6 +359,11 @@ function syncSelectionToUrl(selectedDate, selectedTheatre) {
     url.searchParams.delete("theatre");
   } else {
     url.searchParams.set("theatre", selectedTheatre);
+  }
+
+  if (movieTracking?.eventCode) {
+    url.searchParams.set("eventCode", movieTracking.eventCode);
+    url.searchParams.set("moviename", movieTracking.movieName || "");
   }
 
   window.history.replaceState({}, "", `${url.pathname}?${url.searchParams.toString()}${url.hash}`);
@@ -426,6 +464,143 @@ function buildMovieWiseGroups(shows) {
       (left, right) =>
         right.totalSold - left.totalSold || left.movieLabel.localeCompare(right.movieLabel)
     );
+}
+
+function movieNameFromSearchParam(value) {
+  try {
+    return decodeURIComponent(String(value || "").replace(/\+/g, " ")).trim();
+  } catch {
+    return String(value || "").trim();
+  }
+}
+
+function getInitialMovieTracking() {
+  if (typeof window === "undefined") return DEFAULT_MOVIE_TRACKING;
+
+  const params = new URLSearchParams(window.location.search);
+  const eventCode = params.get("eventCode") || DEFAULT_MOVIE_TRACKING.eventCode;
+  const movieName = movieNameFromSearchParam(params.get("moviename")) || DEFAULT_MOVIE_TRACKING.movieName;
+
+  return {
+    eventCode,
+    movieName,
+    date: params.get("date") || DEFAULT_MOVIE_TRACKING.date
+  };
+}
+
+function normalizeMovieShowtimePayload({ payload, meta, selectedDate, movieName }) {
+  const shows = [];
+  const showDetails = Array.isArray(payload?.ShowDetails) ? payload.ShowDetails : [];
+  const targetDateCode = isoToDateCode(selectedDate);
+
+  for (const showDetail of showDetails) {
+    if (showDetail.Date && String(showDetail.Date) !== targetDateCode) continue;
+
+    const childEvents = Array.isArray(showDetail?.Event?.ChildEvents)
+      ? showDetail.Event.ChildEvents
+      : [];
+    const childEventsByCode = new Map(
+      childEvents
+        .filter((childEvent) => childEvent?.EventCode)
+        .map((childEvent) => [childEvent.EventCode, childEvent])
+    );
+
+    for (const venue of showDetail.Venues || []) {
+      const venueCode = venue.VenueCode;
+      const venueName = venue.VenueName || venueCode;
+      const shortName = THEATRE_BY_CODE.get(venueCode) || venueCode;
+
+      for (const showTime of venue.ShowTimes || []) {
+        const showDateCode = String(showTime.ShowDateCode || showDetail.Date || "");
+        if (targetDateCode && showDateCode !== targetDateCode) continue;
+
+        const childEvent =
+          childEventsByCode.get(showTime.EventCode) || childEvents[0] || showDetail.Event || {};
+        const categories = (showTime.Categories || []).map((category) => {
+          const price = toNumber(category.CurPrice || category.Price || category.price);
+          const totalSeats = toNumber(category.MaxSeats || category.totalSeats);
+          const availableSeats = toNumber(category.SeatsAvail || category.availableSeats);
+          const soldSeats = Math.max(totalSeats - availableSeats, 0);
+
+          return {
+            name: category.PriceDesc || category.name || "Category",
+            label: category.PriceDesc || category.label || category.name || "Category",
+            price,
+            netPrice: netTicketPrice(price),
+            totalSeats,
+            availableSeats,
+            soldSeats,
+            unknownSeats: 0,
+            rows: []
+          };
+        });
+
+        const totalSeats = categories.reduce((sum, category) => sum + category.totalSeats, 0);
+        const availableSeats = categories.reduce((sum, category) => sum + category.availableSeats, 0);
+        const soldSeats = categories.reduce((sum, category) => sum + category.soldSeats, 0);
+        const gross = categories.reduce(
+          (sum, category) => sum + category.soldSeats * netTicketPrice(category.price),
+          0
+        );
+
+        shows.push({
+          id: `${venueCode}-${showTime.SessionId}`,
+          eventCode: showTime.EventCode || childEvent.EventCode || meta?.eventCode,
+          sessionId: showTime.SessionId,
+          venueCode,
+          venueName,
+          theatreShortName: shortName,
+          citySlug: CITY_INFO.slug,
+          showDate: dateCodeToIso(showDateCode),
+          showDateCode,
+          showDateTime: showDateTimeToIso(showTime.ShowDateTime),
+          showDateTimeCode: showTime.ShowDateTime,
+          showTimeLabel: showTime.ShowTime,
+          cutoffAt: showDateTimeToIso(showTime.CutOffDateTime),
+          cutoffCode: showTime.CutOffDateTime || null,
+          format: childEvent.EventDimension || "",
+          language: childEvent.EventLang || "",
+          title: childEvent.EventName || childEvent.EventTitle || movieName,
+          releaseLabel: showDetail?.Event?.EventTitle || childEvent.EventTitle || movieName,
+          censor: childEvent.EventCensor || "",
+          genres: [],
+          categories,
+          totalSeats,
+          availableSeats,
+          soldSeats,
+          unknownSeats: 0,
+          gross,
+          occupancyPercent: totalSeats ? Number(((soldSeats / totalSeats) * 100).toFixed(2)) : 0,
+          source: {
+            method: "movie-event-showtimes",
+            capturedAt: new Date().toISOString()
+          }
+        });
+      }
+    }
+  }
+
+  return {
+    version: 1,
+    generatedAt: meta?.generatedAt || new Date().toISOString(),
+    targetDate: selectedDate,
+    targetDateCode,
+    timezone: CITY_INFO.timezone,
+    city: CITY_INFO,
+    summary: buildSummaryFromShows(shows),
+    movies: summarizeMoviesFromShows(shows),
+    theatres: summarizeTheatresFromShows(shows),
+    shows: shows.sort(compareShows),
+    meta: {
+      status: "ok",
+      source: "movie-event-showtimes",
+      movieTracking: true,
+      eventCode: meta?.eventCode,
+      upstream: meta?.upstream,
+      summary: meta?.summary,
+      cache: meta?.cache
+    }
+  };
 }
 
 function dashboardCacheKey(selectedDate, selectedTheatre) {
@@ -566,7 +741,7 @@ function useDateAvailability(selectedTheatre) {
   return state;
 }
 
-function useDashboardData(selectedDate, selectedTheatre) {
+function useDashboardData(selectedDate, selectedTheatre, movieTracking) {
   const [state, setState] = React.useState({
     loading: true,
     error: null,
@@ -586,6 +761,36 @@ function useDashboardData(selectedDate, selectedTheatre) {
 
     if (liveApiBase) {
       try {
+        if (movieTracking?.eventCode) {
+          const movieUrl = new URL(`${liveApiBase}/api/madanapalle-showtimes`);
+          movieUrl.searchParams.set("eventCode", movieTracking.eventCode);
+          movieUrl.searchParams.set("date", selectedDate);
+          movieUrl.searchParams.set("ts", String(Date.now()));
+
+          if (selectedTheatre !== "ALL") {
+            movieUrl.searchParams.set("venueCode", selectedTheatre);
+          }
+
+          const moviePayload = await fetchJson(movieUrl.toString());
+          return {
+            ok: true,
+            data: annotateClientSource(
+              normalizeMovieShowtimePayload({
+                payload: moviePayload.payload,
+                meta: moviePayload,
+                selectedDate,
+                movieName: movieTracking.movieName
+              }),
+              {
+                mode: "movie-event-showtimes",
+                liveApiBase,
+                selectedDate,
+                selectedTheatre
+              }
+            )
+          };
+        }
+
         const liveUrl = new URL(`${liveApiBase}/api/live`);
         liveUrl.searchParams.set("date", proxyDateParam);
         liveUrl.searchParams.set("ts", String(Date.now()));
@@ -705,7 +910,7 @@ function useDashboardData(selectedDate, selectedTheatre) {
 
       throw error;
     }
-  }, [selectedDate, selectedTheatre]);
+  }, [selectedDate, selectedTheatre, movieTracking?.eventCode, movieTracking?.movieName]);
 
   const loadData = React.useCallback(
     (mode = "initial") => {
@@ -887,27 +1092,43 @@ function MovieWiseBoard({ shows, emptyMessage }) {
 function App() {
   const [selectedDate, setSelectedDate] = React.useState(getInitialSelectedDate);
   const [selectedTheatre, setSelectedTheatre] = React.useState(getInitialSelectedTheatre);
+  const [movieTracking] = React.useState(getInitialMovieTracking);
   const {
     loading: datesLoading,
     error: datesError,
     notes: dateNotes,
-    dateOptions
+    dateOptions: liveDateOptions
   } = useDateAvailability(selectedTheatre);
   const { loading, error, data, refreshing, refresh } = useDashboardData(
     selectedDate,
-    selectedTheatre
+    selectedTheatre,
+    movieTracking
   );
+  const movieModeShowCount = data?.summary?.totalShows || 0;
+  const dateOptions = movieTracking?.eventCode
+    ? [
+        buildDateOption({
+          date: selectedDate,
+          totalShows: movieModeShowCount,
+          theatreCounts: {
+            [selectedTheatre]: {
+              totalShows: movieModeShowCount
+            }
+          }
+        })
+      ]
+    : liveDateOptions;
 
   React.useEffect(() => {
-    if (datesLoading || !dateOptions.length) return;
+    if (movieTracking?.eventCode || datesLoading || !dateOptions.length) return;
     if (isSupportedDate(selectedDate, dateOptions)) return;
 
     setSelectedDate(pickPreferredDate(dateOptions));
-  }, [dateOptions, datesLoading, selectedDate]);
+  }, [dateOptions, datesLoading, movieTracking?.eventCode, selectedDate]);
 
   React.useEffect(() => {
-    syncSelectionToUrl(selectedDate, selectedTheatre);
-  }, [selectedDate, selectedTheatre]);
+    syncSelectionToUrl(selectedDate, selectedTheatre, movieTracking);
+  }, [selectedDate, selectedTheatre, movieTracking]);
 
   if (loading) {
     return (
@@ -946,16 +1167,19 @@ function App() {
   const ageLabel = snapshotAgeLabel(data.generatedAt);
   const clientSource = data.meta?.clientSource || {};
   const isLiveProxy = clientSource.mode === "live-proxy";
+  const isMovieTracking = clientSource.mode === "movie-event-showtimes";
   const refreshButtonLabel = refreshing
     ? "Refreshing..."
-    : isLiveProxy
+    : isLiveProxy || isMovieTracking
       ? "Refresh live data"
       : "Check for newer snapshot";
-  const sourceNote = isLiveProxy
-    ? data.meta?.cache?.hit
-      ? "BookMyShow live discovery was blocked temporarily, so this view is using the last successful theatre-page result with a timestamp."
-      : "Each date selection, theatre selection, and refresh asks the live proxy for current BookMyShow theatre-page shows and seat counts."
-    : "Browser refresh only reloads the latest published JSON. On GitHub Pages, new numbers appear after the collector runs and a fresh deploy is published.";
+  const sourceNote = isMovieTracking
+    ? "Movie tracking mode asks the live Madanapalle showtime mirror for this event code, date, and city on every refresh."
+    : isLiveProxy
+      ? data.meta?.cache?.hit
+        ? "BookMyShow live discovery was blocked temporarily, so this view is using the last successful theatre-page result with a timestamp."
+        : "Each date selection, theatre selection, and refresh asks the live proxy for current BookMyShow theatre-page shows and seat counts."
+      : "Browser refresh only reloads the latest published JSON. On GitHub Pages, new numbers appear after the collector runs and a fresh deploy is published.";
   const selectedTheatreLabel =
     THEATRE_OPTIONS.find((option) => option.value === selectedTheatre)?.label || "All Theatres";
   const availableDateCount = dateOptions.length;
@@ -988,6 +1212,14 @@ function App() {
           </p>
 
           <div className="selector-shell">
+            {movieTracking?.eventCode ? (
+              <div className="movie-tracking-panel">
+                <p className="selector-select__label">Movie</p>
+                <strong>{movieTracking.movieName}</strong>
+                <span>Event code: {movieTracking.eventCode} · Default city: Madanapalle</span>
+              </div>
+            ) : null}
+
             <label className="selector-select-shell">
               <span className="selector-select__label">Theatre</span>
               <select
@@ -1065,7 +1297,9 @@ function App() {
           </div>
           <div className="meta-pill">
             <span>Source Mode</span>
-            <strong>{isLiveProxy ? "Live Proxy" : "Published Snapshot"}</strong>
+            <strong>
+              {isMovieTracking ? "Movie Event Live" : isLiveProxy ? "Live Proxy" : "Published Snapshot"}
+            </strong>
           </div>
         </div>
       </section>
