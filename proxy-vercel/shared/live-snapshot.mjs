@@ -1372,33 +1372,116 @@ function mergeSeedDateManifestEntries(dates, { venueCode, days }) {
   const today = getIndiaTodayIso();
   const maxDate = addDaysIso(today, days - 1);
   const byDate = new Map((dates || []).map((entry) => [entry.date, entry]));
+  const seedByDate = new Map();
 
   for (const [seedVenueCode, date, totalShows, movieLabel] of MADANAPALLE_VISIBLE_DATE_SEEDS) {
     if (venueCode && seedVenueCode !== venueCode) continue;
     if (date < today || date > maxDate) continue;
-    if (byDate.has(date)) continue;
 
-    byDate.set(
-      date,
-      buildSeedDateManifestEntry({
+    if (!seedByDate.has(date)) {
+      seedByDate.set(date, []);
+    }
+    seedByDate.get(date).push({ venueCode: seedVenueCode, totalShows, movieLabel });
+  }
+
+  for (const [date, seedEntries] of seedByDate.entries()) {
+    const existing = byDate.get(date);
+    const seedTotalShows = seedEntries.reduce((sum, entry) => sum + entry.totalShows, 0);
+    if (existing && Number(existing.totalShows || 0) >= seedTotalShows) continue;
+
+    if (seedEntries.length === 1) {
+      const [entry] = seedEntries;
+      byDate.set(
         date,
-        venueCode: seedVenueCode,
-        totalShows,
-        movieLabel
+        buildSeedDateManifestEntry({
+          date,
+          venueCode: entry.venueCode,
+          totalShows: entry.totalShows,
+          movieLabel: entry.movieLabel
+        })
+      );
+      continue;
+    }
+
+    const theatres = seedEntries
+      .map((entry) => {
+        const theatre = MADANAPALLE_THEATRES.find((item) => item.venueCode === entry.venueCode);
+        if (!theatre) return null;
+        return {
+          venueCode: theatre.venueCode,
+          name: theatre.name,
+          shortName: theatre.shortName,
+          totalShows: entry.totalShows,
+          totalCapacity: 0,
+          totalAvailable: 0,
+          totalSold: 0,
+          totalGross: 0,
+          occupancyPercent: 0,
+          available: true
+        };
       })
-    );
+      .filter(Boolean);
+    const movieTitles = [
+      ...new Set(
+        seedEntries.flatMap((entry) =>
+          String(entry.movieLabel || "")
+            .split(",")
+            .map((title) => title.trim())
+            .filter(Boolean)
+        )
+      )
+    ];
+
+    byDate.set(date, {
+      date,
+      dateCode: isoToDateCode(date),
+      generatedAt: new Date().toISOString(),
+      availabilityOnly: true,
+      totalShows: seedTotalShows,
+      theatres,
+      theatreCounts: Object.fromEntries(
+        theatres.map((theatre) => [
+          theatre.venueCode,
+          {
+            totalShows: theatre.totalShows,
+            shortName: theatre.shortName,
+            name: theatre.name,
+            available: true
+          }
+        ])
+      ),
+      movies: movieTitles.map((title) => ({
+        eventCode: "",
+        title,
+        displayTitle: title,
+        language: "Telugu",
+        format: "2D",
+        totalShows: 0,
+        totalCapacity: 0,
+        totalAvailable: 0,
+        totalSold: 0,
+        totalGross: 0,
+        venueCodes: theatres.map((theatre) => theatre.venueCode)
+      }))
+    });
   }
 
   return [...byDate.values()].sort((left, right) => left.date.localeCompare(right.date));
 }
 
 function seededEventCodesForVenueDate(venueCode, date) {
-  if (!venueCode || !date) return [];
+  if (!date) return [];
 
-  const entry = MADANAPALLE_VISIBLE_EVENT_SEEDS.find(
-    ([seedVenueCode, seedDate]) => seedVenueCode === venueCode && seedDate === date
-  );
-  return entry ? entry[2] : [];
+  return [
+    ...new Set(
+      MADANAPALLE_VISIBLE_EVENT_SEEDS
+        .filter(([seedVenueCode, seedDate]) => {
+          if (seedDate !== date) return false;
+          return !venueCode || seedVenueCode === venueCode;
+        })
+        .flatMap((entry) => entry[2])
+    )
+  ];
 }
 
 function buildAvailabilityOnlyEntry(dateOption, theatre) {
