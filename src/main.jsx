@@ -1487,22 +1487,6 @@ function LiveTrackingScreen({ screenSwitcher }) {
       </section>
 
       <Section
-        title="Live Shows"
-        kicker="Selected theatre/date result"
-        aside={<span className="section__hint">{filteredShows.length} show lines</span>}
-      >
-        <ShowCards shows={filteredShows} emptyMessage={emptyMessage} />
-      </Section>
-
-      <Section
-        title="Movie-wise Lines"
-        kicker="Theatre, time, movie, tickets format"
-        aside={<span className="section__hint">{filteredShows.length} show lines</span>}
-      >
-        <MovieWiseBoard shows={filteredShows} emptyMessage={emptyMessage} />
-      </Section>
-
-      <Section
         title="Movie Pulse"
         kicker="Ranked by sold seats"
         aside={<span className="section__hint">{movies.length} movies</span>}
@@ -1650,6 +1634,22 @@ function LiveTrackingScreen({ screenSwitcher }) {
           rows={filteredShows}
           emptyMessage={emptyMessage}
         />
+      </Section>
+
+      <Section
+        title="Movie-wise Lines"
+        kicker="Theatre, time, movie, tickets format"
+        aside={<span className="section__hint">{filteredShows.length} show lines</span>}
+      >
+        <MovieWiseBoard shows={filteredShows} emptyMessage={emptyMessage} />
+      </Section>
+
+      <Section
+        title="Live Shows"
+        kicker="Selected theatre/date result"
+        aside={<span className="section__hint">{filteredShows.length} show lines</span>}
+      >
+        <ShowCards shows={filteredShows} emptyMessage={emptyMessage} />
       </Section>
     </main>
   );
