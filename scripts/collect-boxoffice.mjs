@@ -8,6 +8,9 @@ const ROOT = process.cwd();
 const CONFIG_PATH = path.join(ROOT, "config", "city.json");
 const RUNTIME_CONFIG_PATH = path.join(ROOT, "public", "runtime-config.json");
 const BOXOFFICE_DIR = path.join(ROOT, "public", "data", "boxoffice");
+const PUBLISHED_BOXOFFICE_BASE =
+  process.env.BOXOFFICE_EXISTING_BASE ||
+  "https://sathvikm9.github.io/MPLTracking/data/boxoffice";
 const INDIA_TIMEZONE = "Asia/Kolkata";
 const ACTIVE_THEATRES = new Set(["RTDM", "MSDR", "ASRM", "SKMD"]);
 const CAPTURE_POLICY = {
@@ -172,6 +175,23 @@ async function loadLiveApiBase() {
   return liveApiBase.replace(/\/$/, "");
 }
 
+async function fetchPublishedBoxoffice(isoDate) {
+  const url = `${PUBLISHED_BOXOFFICE_BASE.replace(/\/$/, "")}/${isoDate}.json?ts=${Date.now()}`;
+
+  try {
+    const response = await fetch(url, { headers: { accept: "application/json" } });
+    if (response.status === 404) return null;
+    if (!response.ok) {
+      throw new Error(`${response.status} ${response.statusText}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.warn(`Unable to reuse published boxoffice file: ${error.message}`);
+    return null;
+  }
+}
+
 async function fetchLiveTheatreSnapshot(liveApiBase, targetDate, venueCode) {
   const url = new URL(`${liveApiBase}/api/live`);
   url.searchParams.set("date", targetDate.isoDate);
@@ -250,7 +270,7 @@ async function main() {
   const config = await readJson(CONFIG_PATH, null);
   const liveApiBase = await loadLiveApiBase();
   const outputPath = path.join(BOXOFFICE_DIR, `${targetDate.isoDate}.json`);
-  const existing = await readJson(outputPath, null);
+  const existing = (await readJson(outputPath, null)) || (await fetchPublishedBoxoffice(targetDate.isoDate));
   const capturesByKey = new Map((existing?.captures || []).map((show) => [show.key || captureKey(show), show]));
   const plannedByKey = new Map();
   const errors = [];
