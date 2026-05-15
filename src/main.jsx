@@ -1133,11 +1133,6 @@ function BoxofficeScreen({ screenSwitcher }) {
       <section className="hero hero--boxoffice">
         <div className="hero__content">
           <p className="hero__eyebrow">Madanapalle Live Boxoffice</p>
-          <h1>Cut-off snapshots, collected through the day.</h1>
-          <p className="hero__lede">
-            This screen uses scheduled IST captures. Each show is stored near its BookMyShow cut-off
-            window, then the day total grows show by show for Ravi, Siddartha, ASR, and Sri Krishna.
-          </p>
 
           <div className="selector-shell">
             <label className="selector-select-shell selector-select-shell--date">
@@ -1171,10 +1166,6 @@ function BoxofficeScreen({ screenSwitcher }) {
               {isBusy ? <span className="button-spinner" aria-hidden="true" /> : null}
               {refreshing ? "Refreshing boxoffice..." : "Refresh boxoffice"}
             </button>
-            <p className="hero__note">
-              GitHub Actions checks every 5 minutes. Ravi/Siddartha capture around showtime +28
-              minutes; ASR/Sri Krishna capture about 1 minute before their 15-minute cutoff.
-            </p>
           </div>
         </div>
 
@@ -1382,12 +1373,6 @@ function LiveTrackingScreen({ screenSwitcher }) {
       <section className="hero">
         <div className="hero__content">
           <p className="hero__eyebrow">Madanapalle Live Tracker</p>
-          <h1>Pick a theatre. Pick a date. Get live tickets.</h1>
-          <p className="hero__lede">
-            This page checks only the selected theatre and date. If BookMyShow has visible shows, it
-            displays movie names, show timings, booked tickets, occupancy, and net gross using
-            ₹105→₹100 and ₹84→₹79.
-          </p>
 
           <div className="selector-shell">
             <label className="selector-select-shell">
@@ -1430,10 +1415,6 @@ function LiveTrackingScreen({ screenSwitcher }) {
               {isBusy ? <span className="button-spinner" aria-hidden="true" /> : null}
               {refreshing ? "Refreshing live data..." : "Refresh live data"}
             </button>
-            <p className="hero__note">
-              Every selection and refresh calls the live API again. If the server or BookMyShow mirror
-              fails, this page shows a server error instead of old data.
-            </p>
           </div>
         </div>
 
