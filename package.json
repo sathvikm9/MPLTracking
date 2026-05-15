@@ -12,7 +12,6 @@
     "collect": "node scripts/collect.mjs",
     "collect:tomorrow": "node scripts/collect.mjs --tomorrow",
     "collect:today": "node scripts/collect.mjs --today",
-    "postcollect:today": "node scripts/collect-boxoffice.mjs",
     "collect:sample": "node scripts/collect.mjs --sample",
     "collect:boxoffice": "node scripts/collect-boxoffice.mjs"
   },

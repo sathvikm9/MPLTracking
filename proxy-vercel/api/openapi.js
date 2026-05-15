@@ -38,6 +38,10 @@ function buildOpenApiSpec(req) {
         description: "Raw BookMyShow mirror payload checks by event code"
       },
       {
+        name: "Live boxoffice",
+        description: "Stored boxoffice snapshots and scheduled cutoff collection"
+      },
+      {
         name: "Health",
         description: "Proxy health checks"
       }
@@ -288,6 +292,70 @@ function buildOpenApiSpec(req) {
             },
             500: {
               description: "Mirror/proxy failure"
+            }
+          }
+        }
+      },
+      "/api/boxoffice": {
+        get: {
+          tags: ["Live boxoffice"],
+          summary: "Read stored live boxoffice snapshot",
+          description: "Reads the selected date's captured boxoffice result from Upstash Redis.",
+          parameters: [
+            {
+              name: "date",
+              in: "query",
+              required: true,
+              description: "Boxoffice date in YYYY-MM-DD format.",
+              schema: {
+                type: "string",
+                format: "date"
+              },
+              example: "2026-05-15"
+            }
+          ],
+          responses: {
+            200: {
+              description: "Stored boxoffice snapshot"
+            },
+            404: {
+              description: "No boxoffice data for selected date"
+            }
+          }
+        }
+      },
+      "/api/boxoffice-collect": {
+        get: {
+          tags: ["Live boxoffice"],
+          summary: "Run live boxoffice collector",
+          description:
+            "Fetches fresh live data for Madanapalle theatres, captures shows whose cutoff capture time is due, and writes directly to Upstash Redis. Intended for a minute-level scheduler such as Upstash QStash.",
+          parameters: [
+            {
+              name: "date",
+              in: "query",
+              required: false,
+              description: "Optional boxoffice date in YYYY-MM-DD format. Defaults to current India date.",
+              schema: {
+                type: "string",
+                format: "date"
+              },
+              example: "2026-05-15"
+            },
+            {
+              name: "token",
+              in: "query",
+              required: false,
+              description:
+                "Optional collector token when BOXOFFICE_COLLECT_TOKEN or CRON_SECRET is configured.",
+              schema: {
+                type: "string"
+              }
+            }
+          ],
+          responses: {
+            200: {
+              description: "Collector run summary"
             }
           }
         }
