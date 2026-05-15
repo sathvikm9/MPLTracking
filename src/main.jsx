@@ -1172,8 +1172,8 @@ function BoxofficeScreen({ screenSwitcher }) {
               {refreshing ? "Refreshing boxoffice..." : "Refresh boxoffice"}
             </button>
             <p className="hero__note">
-              GitHub Actions checks every 5 minutes. Ravi/Siddartha are captured around showtime +20
-              minutes; ASR/Sri Krishna around showtime +10 minutes.
+              GitHub Actions checks every 5 minutes. Ravi/Siddartha capture around showtime +28
+              minutes; ASR/Sri Krishna capture about 1 minute before their 15-minute cutoff.
             </p>
           </div>
         </div>

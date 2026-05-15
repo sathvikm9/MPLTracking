@@ -14,10 +14,26 @@ const PUBLISHED_BOXOFFICE_BASE =
 const INDIA_TIMEZONE = "Asia/Kolkata";
 const ACTIVE_THEATRES = new Set(["RTDM", "MSDR", "ASRM", "SKMD"]);
 const CAPTURE_POLICY = {
-  RTDM: { captureAfterMinutes: 20, note: "Ravi usually remains visible until about 25 minutes after showtime." },
-  MSDR: { captureAfterMinutes: 20, note: "Siddartha usually remains visible until about 25-30 minutes after showtime." },
-  ASRM: { captureAfterMinutes: 10, note: "ASR usually remains visible until about 15 minutes after showtime." },
-  SKMD: { captureAfterMinutes: 10, note: "Sri Krishna usually remains visible until about 15 minutes after showtime." }
+  RTDM: {
+    fallbackCaptureAfterMinutes: 28,
+    captureBeforeCutoffMinutes: 2,
+    note: "Ravi BMS payload currently exposes a 30-minute cutoff, so capture 2 minutes before cutoff."
+  },
+  MSDR: {
+    fallbackCaptureAfterMinutes: 28,
+    captureBeforeCutoffMinutes: 2,
+    note: "Siddartha BMS payload currently exposes a 30-minute cutoff, so capture 2 minutes before cutoff."
+  },
+  ASRM: {
+    fallbackCaptureAfterMinutes: 14,
+    captureBeforeCutoffMinutes: 1,
+    note: "ASR cutoff is 15 minutes after showtime, so capture about 1 minute before cutoff."
+  },
+  SKMD: {
+    fallbackCaptureAfterMinutes: 14,
+    captureBeforeCutoffMinutes: 1,
+    note: "Sri Krishna cutoff is 15 minutes after showtime, so capture about 1 minute before cutoff."
+  }
 };
 
 function number(value) {
@@ -62,6 +78,18 @@ function addMinutesToShowIso(showIso, minutes) {
   const date = new Date(showIso);
   date.setMinutes(date.getMinutes() + minutes);
   return date.toISOString();
+}
+
+function resolveCaptureAt(show, policy) {
+  if (show.cutoffAt) {
+    const cutoffDate = new Date(show.cutoffAt);
+    if (Number.isFinite(cutoffDate.getTime())) {
+      cutoffDate.setMinutes(cutoffDate.getMinutes() - number(policy.captureBeforeCutoffMinutes));
+      return cutoffDate.toISOString();
+    }
+  }
+
+  return addMinutesToShowIso(show.showDateTime, policy.fallbackCaptureAfterMinutes);
 }
 
 function captureKey(show) {
@@ -284,7 +312,8 @@ async function main() {
     try {
       const snapshot = await fetchLiveTheatreSnapshot(liveApiBase, targetDate, theatre.venueCode);
       const policy = CAPTURE_POLICY[theatre.venueCode] || {
-        captureAfterMinutes: theatre.fallbackCutoffMinutes || 15,
+        fallbackCaptureAfterMinutes: theatre.fallbackCutoffMinutes || 15,
+        captureBeforeCutoffMinutes: 1,
         note: "Fallback theatre capture policy."
       };
 
@@ -293,7 +322,7 @@ async function main() {
         if (show.venueCode !== theatre.venueCode) continue;
         if (!show.showDateTime) continue;
 
-        const captureAt = addMinutesToShowIso(show.showDateTime, policy.captureAfterMinutes);
+        const captureAt = resolveCaptureAt(show, policy);
         const key = captureKey(show);
         plannedByKey.set(key, {
           ...show,
