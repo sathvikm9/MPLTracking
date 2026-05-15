@@ -1454,10 +1454,10 @@ function LiveTrackingScreen({ screenSwitcher }) {
           caption={`${number(summary.totalAvailable)} seats still available`}
           tone="amber"
         />
-          <StatCard
+        <StatCard
           eyebrow="Gross"
           value={currency(summary.totalGross)}
-          caption={`${number(summary.totalShows)} live shows using ₹105→₹100 and ₹84→₹79`}
+          caption={`${number(summary.totalShows)} live shows using live ticket price minus ₹5`}
           tone="ink"
         />
         <StatCard

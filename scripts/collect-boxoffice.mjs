@@ -47,8 +47,7 @@ function showGross(show) {
 
   return categories.reduce((sum, category) => {
     const soldSeats = number(category.soldSeats);
-    const netPrice = number(category.netPrice) || Math.max(number(category.price) - 5, 0);
-    return sum + soldSeats * netPrice;
+    return sum + soldSeats * Math.max(number(category.price) - 5, 0);
   }, 0);
 }
 
@@ -255,7 +254,7 @@ function normalizeShowForCapture(show, capturedAt, captureAt, policy) {
     capturePolicy: policy,
     categories: categories.map((category) => ({
       ...category,
-      netPrice: number(category.netPrice) || Math.max(number(category.price) - 5, 0)
+      netPrice: Math.max(number(category.price) - 5, 0)
     })),
     gross,
     occupancyPercent: totalSeats ? Number(((soldSeats / totalSeats) * 100).toFixed(2)) : 0,

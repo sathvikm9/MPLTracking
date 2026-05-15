@@ -116,7 +116,7 @@ function buildOpenApiSpec(req) {
           tags: ["Live tracking"],
           summary: "Get live sold-ticket snapshot for a date",
           description:
-            "Returns shows and live sold-ticket counts for the selected date/theatre. Gross uses net ticket price: 105 -> 100 and 84 -> 79. Add strict=1 when you want live theatre-page or live mirror data only, with no static snapshot fallback.",
+            "Returns shows and live sold-ticket counts for the selected date/theatre. Gross uses each live category ticket price minus 5 rupees. Add strict=1 when you want live theatre-page or live mirror data only, with no static snapshot fallback.",
           parameters: [
             {
               name: "date",
