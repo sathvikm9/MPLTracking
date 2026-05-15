@@ -11,6 +11,7 @@ const BOXOFFICE_DIR = path.join(ROOT, "public", "data", "boxoffice");
 const PUBLISHED_BOXOFFICE_BASE =
   process.env.BOXOFFICE_EXISTING_BASE ||
   "https://sathvikm9.github.io/MPLTracking/data/boxoffice";
+const BOXOFFICE_INGEST_AUDIENCE = "mpltracking-boxoffice-ingest";
 const INDIA_TIMEZONE = "Asia/Kolkata";
 const ACTIVE_THEATRES = new Set(["RTDM", "MSDR", "ASRM", "SKMD"]);
 const CAPTURE_POLICY = {
@@ -240,6 +241,59 @@ async function fetchLiveTheatreSnapshot(liveApiBase, targetDate, venueCode) {
   return data;
 }
 
+async function publishRemoteBoxoffice(liveApiBase, data) {
+  const ingestUrl = process.env.BOXOFFICE_INGEST_URL || `${liveApiBase}/api/boxoffice-ingest`;
+  const token = String(process.env.BOXOFFICE_INGEST_TOKEN || "");
+  const headers = {
+    accept: "application/json",
+    "content-type": "application/json"
+  };
+
+  if (token) {
+    headers["x-boxoffice-ingest-token"] = token;
+  } else {
+    const oidcToken = await getGithubActionsOidcToken();
+    if (!oidcToken) return null;
+    headers.authorization = `Bearer ${oidcToken}`;
+  }
+
+  const response = await fetch(ingestUrl, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(data)
+  });
+  const text = await response.text();
+
+  if (!response.ok) {
+    throw new Error(`Remote boxoffice publish failed: ${response.status} ${text.slice(0, 180)}`);
+  }
+
+  return text ? JSON.parse(text) : null;
+}
+
+async function getGithubActionsOidcToken() {
+  const requestUrl = process.env.ACTIONS_ID_TOKEN_REQUEST_URL;
+  const requestToken = process.env.ACTIONS_ID_TOKEN_REQUEST_TOKEN;
+  if (!requestUrl || !requestToken) return null;
+
+  const url = new URL(requestUrl);
+  url.searchParams.set("audience", BOXOFFICE_INGEST_AUDIENCE);
+
+  const response = await fetch(url, {
+    headers: {
+      authorization: `Bearer ${requestToken}`,
+      accept: "application/json"
+    }
+  });
+
+  if (!response.ok) {
+    throw new Error(`Unable to request GitHub OIDC token: ${response.status}`);
+  }
+
+  const payload = await response.json();
+  return payload.value;
+}
+
 function normalizeShowForCapture(show, capturedAt, captureAt, policy) {
   const categories = Array.isArray(show.categories) ? show.categories : [];
   const gross = showGross(show);
@@ -353,6 +407,13 @@ async function main() {
   await fs.writeFile(outputPath, `${JSON.stringify(data, null, 2)}\n`, "utf8");
   await fs.writeFile(path.join(BOXOFFICE_DIR, "latest.json"), `${JSON.stringify(data, null, 2)}\n`, "utf8");
 
+  let remotePublish = null;
+  try {
+    remotePublish = await publishRemoteBoxoffice(liveApiBase, data);
+  } catch (error) {
+    errors.push(error.message);
+  }
+
   console.log(
     JSON.stringify(
       {
@@ -362,6 +423,7 @@ async function main() {
         plannedShows: data.plannedShows.length,
         totalSold: data.summary.totalSold,
         totalGross: data.summary.totalGross,
+        remotePublish,
         errors
       },
       null,

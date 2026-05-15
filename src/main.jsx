@@ -898,6 +898,17 @@ function useDashboardData(selectedDate, selectedTheatre) {
 }
 
 async function loadBoxofficeFile(selectedDate) {
+  const config = await loadRuntimeConfig();
+  const liveApiBase = normalizeLiveApiBase(config);
+
+  if (liveApiBase) {
+    try {
+      return await fetchJson(`${liveApiBase}/api/boxoffice?date=${selectedDate}&ts=${Date.now()}`);
+    } catch {
+      // Static JSON remains the emergency fallback while Upstash is being configured.
+    }
+  }
+
   return fetchJson(`./data/boxoffice/${selectedDate}.json?ts=${Date.now()}`);
 }
 
