@@ -16,24 +16,24 @@ const INDIA_TIMEZONE = "Asia/Kolkata";
 const ACTIVE_THEATRES = new Set(["RTDM", "MSDR", "ASRM", "SKMD"]);
 const CAPTURE_POLICY = {
   RTDM: {
-    fallbackCaptureAfterMinutes: 28,
-    captureBeforeCutoffMinutes: 2,
-    note: "Ravi BMS payload currently exposes a 30-minute cutoff, so capture 2 minutes before cutoff."
+    fallbackCaptureAfterMinutes: 25,
+    captureBeforeCutoffMinutes: 5,
+    note: "Ravi BMS payload currently exposes a 30-minute cutoff, so capture about 5 minutes before cutoff."
   },
   MSDR: {
-    fallbackCaptureAfterMinutes: 28,
-    captureBeforeCutoffMinutes: 2,
-    note: "Siddartha BMS payload currently exposes a 30-minute cutoff, so capture 2 minutes before cutoff."
+    fallbackCaptureAfterMinutes: 25,
+    captureBeforeCutoffMinutes: 5,
+    note: "Siddartha BMS payload currently exposes a 30-minute cutoff, so capture about 5 minutes before cutoff."
   },
   ASRM: {
-    fallbackCaptureAfterMinutes: 14,
-    captureBeforeCutoffMinutes: 1,
-    note: "ASR cutoff is 15 minutes after showtime, so capture about 1 minute before cutoff."
+    fallbackCaptureAfterMinutes: 12,
+    captureBeforeCutoffMinutes: 3,
+    note: "ASR cutoff is 15 minutes after showtime, so capture about 3 minutes before cutoff."
   },
   SKMD: {
-    fallbackCaptureAfterMinutes: 14,
-    captureBeforeCutoffMinutes: 1,
-    note: "Sri Krishna cutoff is 15 minutes after showtime, so capture about 1 minute before cutoff."
+    fallbackCaptureAfterMinutes: 12,
+    captureBeforeCutoffMinutes: 3,
+    note: "Sri Krishna cutoff is 15 minutes after showtime, so capture about 3 minutes before cutoff."
   }
 };
 
