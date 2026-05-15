@@ -116,7 +116,7 @@ function buildOpenApiSpec(req) {
           tags: ["Live tracking"],
           summary: "Get live sold-ticket snapshot for a date",
           description:
-            "Returns shows and live sold-ticket counts for the selected date/theatre. Gross uses each live category ticket price minus 5 rupees. Add strict=1 when you want live theatre-page or live mirror data only, with no static snapshot fallback.",
+            "Returns shows and live sold-ticket counts for the selected date/theatre. Gross uses each live category ticket price minus 5 rupees. Use liveOnly=1 to block static snapshot fallback while still allowing theatre-page to live-mirror retry.",
           parameters: [
             {
               name: "date",
@@ -142,16 +142,40 @@ function buildOpenApiSpec(req) {
               example: "RTDM"
             },
             {
-              name: "strict",
+              name: "liveOnly",
               in: "query",
               required: false,
               description:
-                "Set to 1 for the calendar UI flow. This permits live mirror fallback if theatre-page discovery is blocked, but prevents old/static fallback data.",
+                "Set to 1 for Live Tracking. This tries BookMyShow theatre-page first, then the live Madanapalle mirror/catalog path, with no static snapshot fallback.",
               schema: {
                 type: "string",
                 enum: ["1"]
               },
               example: "1"
+            },
+            {
+              name: "mirrorOnly",
+              in: "query",
+              required: false,
+              description:
+                "Set to 1 to skip theatre-page discovery and retry directly through the live Madanapalle mirror/catalog path.",
+              schema: {
+                type: "string",
+                enum: ["1"]
+              },
+              example: "1"
+            },
+            {
+              name: "mirrorRetryRounds",
+              in: "query",
+              required: false,
+              description: "Number of live mirror retry rounds. Values are clamped between 1 and 6.",
+              schema: {
+                type: "integer",
+                minimum: 1,
+                maximum: 6
+              },
+              example: 6
             },
             {
               name: "_",

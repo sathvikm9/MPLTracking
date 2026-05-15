@@ -798,33 +798,62 @@ function useDashboardData(selectedDate, selectedTheatre) {
       throw new Error(SERVER_ERROR_MESSAGE);
     }
 
-    const liveUrl = new URL(`${liveApiBase}/api/live`);
-    liveUrl.searchParams.set("date", selectedDate);
-    liveUrl.searchParams.set("strict", "1");
-    liveUrl.searchParams.set("ts", String(Date.now()));
+    const buildLiveUrl = (params = {}) => {
+      const liveUrl = new URL(`${liveApiBase}/api/live`);
+      liveUrl.searchParams.set("date", selectedDate);
+      liveUrl.searchParams.set("liveOnly", "1");
+      liveUrl.searchParams.set("allowCache", "0");
+      liveUrl.searchParams.set("ts", String(Date.now()));
 
-    if (selectedTheatre !== "ALL") {
-      liveUrl.searchParams.set("venueCode", selectedTheatre);
-    }
+      if (selectedTheatre !== "ALL") {
+        liveUrl.searchParams.set("venueCode", selectedTheatre);
+      }
 
-    const liveData = await fetchJson(liveUrl.toString());
-    if (liveData.targetDate !== selectedDate) {
-      throw new Error(SERVER_ERROR_MESSAGE);
-    }
+      for (const [key, value] of Object.entries(params)) {
+        liveUrl.searchParams.set(key, String(value));
+      }
 
-    if (isLiveCountFailure(liveData)) {
-      throw new Error(SERVER_ERROR_MESSAGE);
-    }
-
-    return {
-      ok: true,
-      data: annotateClientSource(liveData, {
-        mode: "live-proxy",
-        liveApiBase,
-        selectedDate,
-        selectedTheatre
-      })
+      return liveUrl;
     };
+
+    const attempts = [
+      {
+        mode: "live-proxy-theatre-first",
+        url: buildLiveUrl({ mirrorRetryRounds: 4 })
+      },
+      {
+        mode: "live-proxy-mirror-retry",
+        url: buildLiveUrl({ mirrorOnly: 1, mirrorRetryRounds: 6 })
+      }
+    ];
+    let lastError = null;
+
+    for (const attempt of attempts) {
+      try {
+        const liveData = await fetchJson(attempt.url.toString());
+        if (liveData.targetDate !== selectedDate) {
+          throw new Error(SERVER_ERROR_MESSAGE);
+        }
+
+        if (isLiveCountFailure(liveData)) {
+          throw new Error(SERVER_ERROR_MESSAGE);
+        }
+
+        return {
+          ok: true,
+          data: annotateClientSource(liveData, {
+            mode: attempt.mode,
+            liveApiBase,
+            selectedDate,
+            selectedTheatre
+          })
+        };
+      } catch (error) {
+        lastError = error;
+      }
+    }
+
+    throw lastError || new Error(SERVER_ERROR_MESSAGE);
   }, [selectedDate, selectedTheatre]);
 
   const loadData = React.useCallback(
@@ -1643,6 +1672,8 @@ function LiveTrackingScreen({ screenSwitcher }) {
       >
         <ShowCards shows={filteredShows} emptyMessage={emptyMessage} />
       </Section>
+
+      <Notes notes={data?.meta?.notes || []} />
     </main>
   );
 }

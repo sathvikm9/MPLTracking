@@ -1056,7 +1056,8 @@ async function buildCatalogLiveSnapshot({
   venueCode,
   fetchImpl,
   snapshotBaseUrl,
-  allowLastGoodCache = true
+  allowLastGoodCache = true,
+  retryRounds = 2
 }) {
   const notes = [];
   const seededEventCodes = seededEventCodesForVenueDate(venueCode, date);
@@ -1071,7 +1072,7 @@ async function buildCatalogLiveSnapshot({
     targetDate: date,
     venueCode,
     seedBaseline: null,
-    retryRounds: 2,
+    retryRounds,
     eventCodes,
     allowLastGoodCache
   });
@@ -1179,15 +1180,39 @@ export async function buildLiveSnapshot({
   const url = new URL(requestUrl);
   const date = url.searchParams.get("date") || getIndiaTodayIso();
   const venueCode = url.searchParams.get("venueCode");
-  const strictLiveOnly = url.searchParams.get("strict") === "1";
+  const liveOnly = url.searchParams.get("liveOnly") === "1";
+  const strictLiveOnly = url.searchParams.get("strict") === "1" || liveOnly;
+  const mirrorOnly = url.searchParams.get("mirrorOnly") === "1";
+  const allowLastGoodCache = !strictLiveOnly && url.searchParams.get("allowCache") !== "0";
+  const mirrorRetryRounds = Math.min(
+    Math.max(Number(url.searchParams.get("mirrorRetryRounds") || (strictLiveOnly ? 4 : 2)), 1),
+    6
+  );
   let baseline;
+
+  if (mirrorOnly) {
+    try {
+      return await buildCatalogLiveSnapshot({
+        date,
+        venueCode,
+        fetchImpl,
+        snapshotBaseUrl,
+        allowLastGoodCache,
+        retryRounds: mirrorRetryRounds
+      });
+    } catch (error) {
+      if (strictLiveOnly) {
+        throw new Error(`Live mirror fallback failed: ${error.message}`);
+      }
+    }
+  }
 
   try {
     return await buildTheatreLiveSnapshot({
       date,
       venueCode,
       fetchImpl,
-      allowLastGoodCache: !strictLiveOnly
+      allowLastGoodCache
     });
   } catch (error) {
     try {
@@ -1196,7 +1221,8 @@ export async function buildLiveSnapshot({
         venueCode,
         fetchImpl,
         snapshotBaseUrl,
-        allowLastGoodCache: !strictLiveOnly
+        allowLastGoodCache,
+        retryRounds: mirrorRetryRounds
       });
 
       return {
