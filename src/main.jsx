@@ -501,6 +501,26 @@ function getInitialMovieTracking() {
   };
 }
 
+function getInitialScreen() {
+  if (typeof window === "undefined") return "tracking";
+
+  const view = new URLSearchParams(window.location.search).get("view");
+  return view === "boxoffice" ? "boxoffice" : "tracking";
+}
+
+function syncScreenToUrl(screen) {
+  if (typeof window === "undefined") return;
+
+  const url = new URL(window.location.href);
+  if (screen === "boxoffice") {
+    url.searchParams.set("view", "boxoffice");
+  } else {
+    url.searchParams.delete("view");
+  }
+
+  window.history.replaceState({}, "", `${url.pathname}?${url.searchParams.toString()}${url.hash}`);
+}
+
 function normalizeMovieShowtimePayload({ payload, meta, selectedDate, movieName }) {
   const shows = [];
   const showDetails = Array.isArray(payload?.ShowDetails) ? payload.ShowDetails : [];
@@ -877,6 +897,61 @@ function useDashboardData(selectedDate, selectedTheatre) {
   return { ...state, refresh };
 }
 
+async function loadBoxofficeFile(selectedDate) {
+  return fetchJson(`./data/boxoffice/${selectedDate}.json?ts=${Date.now()}`);
+}
+
+function useBoxofficeData(selectedDate) {
+  const [state, setState] = React.useState({
+    loading: true,
+    refreshing: false,
+    error: null,
+    data: null
+  });
+
+  const loadData = React.useCallback(
+    (mode = "initial") => {
+      const isInitial = mode === "initial";
+
+      setState((current) => ({
+        ...current,
+        loading: isInitial ? true : current.loading,
+        refreshing: !isInitial,
+        error: null
+      }));
+
+      loadBoxofficeFile(selectedDate)
+        .then((data) => {
+          setState({
+            loading: false,
+            refreshing: false,
+            error: null,
+            data
+          });
+        })
+        .catch((error) => {
+          setState({
+            loading: false,
+            refreshing: false,
+            error,
+            data: null
+          });
+        });
+    },
+    [selectedDate]
+  );
+
+  React.useEffect(() => {
+    loadData("initial");
+  }, [loadData]);
+
+  const refresh = React.useCallback(() => {
+    loadData("refresh");
+  }, [loadData]);
+
+  return { ...state, refresh };
+}
+
 function StatCard({ eyebrow, value, caption, tone = "default" }) {
   return (
     <article className={`stat-card stat-card--${tone}`}>
@@ -1012,7 +1087,257 @@ function ShowCards({ shows, emptyMessage }) {
   );
 }
 
-function App() {
+function ScreenSwitcher({ activeScreen, onChange }) {
+  return (
+    <nav className="screen-switcher" aria-label="Tracking mode">
+      <button
+        className={`screen-switcher__button${activeScreen === "tracking" ? " screen-switcher__button--active" : ""}`}
+        type="button"
+        onClick={() => onChange("tracking")}
+      >
+        Live Tracking
+      </button>
+      <button
+        className={`screen-switcher__button${activeScreen === "boxoffice" ? " screen-switcher__button--active" : ""}`}
+        type="button"
+        onClick={() => onChange("boxoffice")}
+      >
+        Live Boxoffice
+      </button>
+    </nav>
+  );
+}
+
+function BoxofficeScreen({ screenSwitcher }) {
+  const [selectedDate, setSelectedDate] = React.useState(getIndiaTodayIso);
+  const { loading, refreshing, error, data, refresh } = useBoxofficeData(selectedDate);
+  const isBusy = loading || refreshing;
+  const captures = [...(data?.captures || [])].sort(compareShows);
+  const plannedShows = [...(data?.plannedShows || [])].sort(compareShows);
+  const summary = data?.summary || buildSummaryFromShows([]);
+  const theatres = data?.theatres || [];
+  const movies = data?.movies || [];
+  const emptyMessage =
+    error?.status === 404
+      ? `No boxoffice captures yet for ${formatSelectedDateLabel(selectedDate)}.`
+      : error
+        ? "Boxoffice file is not available right now. Please try again after the next scheduled run."
+        : isBusy
+          ? "Loading Live Boxoffice..."
+          : `No boxoffice captures yet for ${formatSelectedDateLabel(selectedDate)}.`;
+
+  return (
+    <main className="app-shell">
+      {screenSwitcher}
+
+      <section className="hero hero--boxoffice">
+        <div className="hero__content">
+          <p className="hero__eyebrow">Madanapalle Live Boxoffice</p>
+          <h1>Cut-off snapshots, collected through the day.</h1>
+          <p className="hero__lede">
+            This screen uses scheduled IST captures. Each show is stored near its BookMyShow cut-off
+            window, then the day total grows show by show for Ravi, Siddartha, ASR, and Sri Krishna.
+          </p>
+
+          <div className="selector-shell">
+            <label className="selector-select-shell selector-select-shell--date">
+              <span className="selector-select__label">Select boxoffice date</span>
+              <input
+                className="date-input"
+                type="date"
+                value={selectedDate}
+                onChange={(event) => setSelectedDate(event.target.value || getIndiaTodayIso())}
+              />
+            </label>
+          </div>
+
+          <div
+            className={`status-panel${
+              error ? " status-panel--error" : isBusy ? " status-panel--loading" : ""
+            }`}
+          >
+            {isBusy ? <span className="status-spinner" aria-hidden="true" /> : null}
+            <span>
+              {isBusy
+                ? "Loading scheduled boxoffice captures..."
+                : error
+                  ? emptyMessage
+                  : `${number(captures.length)} cut-off show captures loaded.`}
+            </span>
+          </div>
+
+          <div className="hero__actions">
+            <button className="refresh-button" onClick={refresh} disabled={isBusy}>
+              {isBusy ? <span className="button-spinner" aria-hidden="true" /> : null}
+              {refreshing ? "Refreshing boxoffice..." : "Refresh boxoffice"}
+            </button>
+            <p className="hero__note">
+              GitHub Actions checks every 5 minutes. Ravi/Siddartha are captured around showtime +20
+              minutes; ASR/Sri Krishna around showtime +10 minutes.
+            </p>
+          </div>
+        </div>
+
+        <div className="hero__meta">
+          <div className="meta-pill">
+            <span>Boxoffice Date</span>
+            <strong>{formatSelectedDateLabel(selectedDate)}</strong>
+          </div>
+          <div className="meta-pill">
+            <span>Last Scheduled Run</span>
+            <strong>{data ? formatGeneratedAt(data) : "Not loaded yet"}</strong>
+            <small>{data ? snapshotAgeLabel(data.generatedAt) : "Waiting for collector"}</small>
+          </div>
+          <div className="meta-pill">
+            <span>Captured Shows</span>
+            <strong>{number(captures.length)}</strong>
+            <small>{plannedShows.length ? `${number(plannedShows.length)} currently visible/planned` : "No planned rows"}</small>
+          </div>
+          <div className="meta-pill">
+            <span>Status</span>
+            <strong>{data?.meta?.status || (error ? "not ready" : "loading")}</strong>
+            <small>Fresh only when scheduled capture succeeds</small>
+          </div>
+        </div>
+      </section>
+
+      <section className="stats-grid">
+        <StatCard
+          eyebrow="Gross"
+          value={currency(summary.totalGross)}
+          caption={`${number(summary.totalShows)} captured shows`}
+          tone="ink"
+        />
+        <StatCard
+          eyebrow="Tickets"
+          value={number(summary.totalSold)}
+          caption={`${number(summary.totalCapacity)} total seats captured`}
+          tone="warm"
+        />
+        <StatCard
+          eyebrow="Occupancy"
+          value={percent(summary.occupancyPercent)}
+          caption={`${number(summary.totalAvailable)} seats available at capture`}
+          tone="amber"
+        />
+        <StatCard
+          eyebrow="Movies"
+          value={number(movies.length)}
+          caption={`${number(theatres.length)} theatres captured`}
+        />
+      </section>
+
+      <Section
+        title="City Summary"
+        kicker="Madanapalle day total"
+        aside={<span className="section__hint">{number(captures.length)} captures</span>}
+      >
+        <Table
+          columns={[
+            { key: "city", label: "City" },
+            { key: "state", label: "State" },
+            { key: "gross", label: "Gross", render: (row) => currency(row.gross) },
+            { key: "tickets", label: "Tickets", render: (row) => number(row.tickets) },
+            { key: "shows", label: "Shows", render: (row) => number(row.shows) },
+            { key: "ff", label: "FF", render: (row) => number(row.ff) },
+            { key: "hf", label: "HF", render: (row) => number(row.hf) },
+            { key: "occ", label: "Occ", render: (row) => percent(row.occ) }
+          ]}
+          rows={
+            captures.length
+              ? [
+                  {
+                    id: "madanapalle",
+                    city: CITY_INFO.name,
+                    state: CITY_INFO.state,
+                    gross: summary.totalGross,
+                    tickets: summary.totalSold,
+                    shows: summary.totalShows,
+                    ff: summary.ff || 0,
+                    hf: summary.hf || 0,
+                    occ: summary.occupancyPercent
+                  }
+                ]
+              : []
+          }
+          emptyMessage={emptyMessage}
+        />
+      </Section>
+
+      <Section
+        title="Theatre Boxoffice"
+        kicker="Venue format"
+        aside={<span className="section__hint">{number(theatres.length)} theatres</span>}
+      >
+        <Table
+          columns={[
+            { key: "shortName", label: "Theatre" },
+            { key: "totalGross", label: "Gross", render: (row) => currency(row.totalGross) },
+            { key: "totalSold", label: "Tickets", render: (row) => number(row.totalSold) },
+            { key: "totalShows", label: "Shows", render: (row) => number(row.totalShows) },
+            { key: "ff", label: "FF", render: (row) => number(row.ff) },
+            { key: "hf", label: "HF", render: (row) => number(row.hf) },
+            { key: "occupancyPercent", label: "Occ", render: (row) => percent(row.occupancyPercent) }
+          ]}
+          rows={theatres.map((theatre) => ({ ...theatre, id: theatre.venueCode }))}
+          emptyMessage={emptyMessage}
+        />
+      </Section>
+
+      <Section
+        title="Movies in Madanapalle"
+        kicker="Movie format"
+        aside={<span className="section__hint">{number(movies.length)} movies</span>}
+      >
+        <Table
+          columns={[
+            {
+              key: "title",
+              label: "Movie",
+              render: (movie) => (
+                <strong>
+                  {movie.title} [{movie.format || "NA"} | {movie.language || "NA"}]
+                </strong>
+              )
+            },
+            { key: "totalGross", label: "Gross", render: (movie) => currency(movie.totalGross) },
+            { key: "totalSold", label: "Sold", render: (movie) => number(movie.totalSold) },
+            { key: "totalShows", label: "Shows", render: (movie) => number(movie.totalShows) },
+            { key: "ff", label: "FF", render: (movie) => number(movie.ff) },
+            { key: "hf", label: "HF", render: (movie) => number(movie.hf) },
+            { key: "occupancyPercent", label: "Occ", render: (movie) => percent(movie.occupancyPercent) }
+          ]}
+          rows={movies.map((movie) => ({ ...movie, id: movie.key || movie.eventCode }))}
+          emptyMessage={emptyMessage}
+        />
+      </Section>
+
+      <Section
+        title="Captured Show Ledger"
+        kicker="Stored at each cut-off run"
+        aside={<span className="section__hint">{number(captures.length)} shows</span>}
+      >
+        <Table
+          columns={[
+            { key: "theatreShortName", label: "Theatre" },
+            { key: "showTimeLabel", label: "Time" },
+            { key: "movie", label: "Movie", render: (show) => movieLabelFromShow(show) },
+            { key: "soldSeats", label: "Tickets", render: (show) => ticketLabel(show.soldSeats) },
+            { key: "gross", label: "Gross", render: (show) => currency(showGross(show)) },
+            { key: "occupancyPercent", label: "Occ", render: (show) => percent(show.occupancyPercent) },
+            { key: "capturedAt", label: "Captured", render: (show) => formatGeneratedAt({ generatedAt: show.capturedAt }) }
+          ]}
+          rows={captures.map((show) => ({ ...show, id: show.key || show.id }))}
+          emptyMessage={emptyMessage}
+        />
+      </Section>
+
+      <Notes notes={data?.meta?.errors || []} />
+    </main>
+  );
+}
+
+function LiveTrackingScreen({ screenSwitcher }) {
   const [selectedDate, setSelectedDate] = React.useState(getInitialSelectedDate);
   const [selectedTheatre, setSelectedTheatre] = React.useState(getInitialSelectedTheatre);
   const { loading, error, data, refreshing, refresh } = useDashboardData(selectedDate, selectedTheatre);
@@ -1052,6 +1377,8 @@ function App() {
 
   return (
     <main className="app-shell">
+      {screenSwitcher}
+
       <section className="hero">
         <div className="hero__content">
           <p className="hero__eyebrow">Madanapalle Live Tracker</p>
@@ -1325,6 +1652,24 @@ function App() {
         />
       </Section>
     </main>
+  );
+}
+
+function App() {
+  const [activeScreen, setActiveScreen] = React.useState(getInitialScreen);
+
+  React.useEffect(() => {
+    syncScreenToUrl(activeScreen);
+  }, [activeScreen]);
+
+  const screenSwitcher = (
+    <ScreenSwitcher activeScreen={activeScreen} onChange={setActiveScreen} />
+  );
+
+  return activeScreen === "boxoffice" ? (
+    <BoxofficeScreen screenSwitcher={screenSwitcher} />
+  ) : (
+    <LiveTrackingScreen screenSwitcher={screenSwitcher} />
   );
 }
 
