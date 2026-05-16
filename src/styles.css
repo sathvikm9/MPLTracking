@@ -571,10 +571,12 @@ tr:last-child td {
 }
 
 .show-card__numbers strong,
-.show-card__numbers span {
+.show-card__numbers span,
+.show-card__numbers em {
   padding: 10px 12px;
   border-radius: 14px;
   font-family: "Space Grotesk", sans-serif;
+  font-style: normal;
 }
 
 .show-card__numbers strong {
@@ -586,10 +588,24 @@ tr:last-child td {
   background: rgba(22, 21, 20, 0.07);
 }
 
+.show-card__numbers em {
+  background: rgba(214, 161, 45, 0.16);
+  color: #8a6200;
+}
+
 .show-card__meta {
   font-size: 0.92rem;
   line-height: 1.55;
   color: var(--ink-soft);
+}
+
+.show-card__blocked,
+.movie-line__blocked {
+  margin: 0;
+  font-size: 0.9rem;
+  line-height: 1.55;
+  color: #8a6200;
+  font-weight: 700;
 }
 
 .movie-cluster-grid {
@@ -650,7 +666,8 @@ tr:last-child td {
 
 .movie-line__sentence,
 .movie-line__result,
-.movie-line__meta {
+.movie-line__meta,
+.movie-line__blocked {
   margin: 0;
 }
 
@@ -671,6 +688,10 @@ tr:last-child td {
   margin-top: 6px;
   font-size: 0.9rem;
   color: var(--ink-soft);
+}
+
+.movie-line__blocked {
+  margin-top: 6px;
 }
 
 .caveat-grid {

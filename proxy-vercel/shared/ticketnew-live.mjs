@@ -12,6 +12,7 @@ const QUERY_PARAMS = {
   channel: "WEBAPPTICKETNEW"
 };
 const AVAILABLE_SEAT_STATUSES = new Set([0, 1000, 1001, 1002]);
+const SAI_CHITRA_DEFAULT_BLOCKED_SEATS_PER_SHOW = 19;
 
 export const SAI_CHITRA_THEATRE = {
   venueCode: "SAIC",
@@ -290,15 +291,58 @@ function categoriesFromSeatMap(session, seatMapPayload) {
   });
 }
 
+function applySaiChitraBlockedSeats(categories) {
+  let remainingBlockedSeats = SAI_CHITRA_DEFAULT_BLOCKED_SEATS_PER_SHOW;
+  const preferredOrder = categories
+    .map((category, index) => ({ category, index }))
+    .sort((left, right) => {
+      const leftReserved = /reserved/i.test(left.category.label || left.category.name || "");
+      const rightReserved = /reserved/i.test(right.category.label || right.category.name || "");
+      if (leftReserved !== rightReserved) return leftReserved ? -1 : 1;
+      return Number(right.category.soldSeats || 0) - Number(left.category.soldSeats || 0);
+    })
+    .map((entry) => entry.index);
+  const blockedByIndex = new Map();
+
+  for (const index of preferredOrder) {
+    const category = categories[index];
+    const rawSoldSeats = Number(category.soldSeats || 0);
+    const blockedSeats = Math.min(rawSoldSeats, remainingBlockedSeats);
+    blockedByIndex.set(index, blockedSeats);
+    remainingBlockedSeats -= blockedSeats;
+    if (remainingBlockedSeats <= 0) break;
+  }
+
+  return categories.map((category, index) => {
+    const rawSoldSeats = Number(category.soldSeats || 0);
+    const blockedSeats = Number(blockedByIndex.get(index) || 0);
+    const price = toNumber(category.price);
+    const netPrice = netTicketPrice(price);
+
+    return {
+      ...category,
+      rawSoldSeats,
+      blockedSeats,
+      blockedGross: blockedSeats * netPrice,
+      soldSeats: Math.max(rawSoldSeats - blockedSeats, 0),
+      netPrice
+    };
+  });
+}
+
 function buildShowFromCategories({ session, movie, categories, theatrePageUrl }) {
   const dateInfo = indiaDateInfoFromSession(session);
-  const totalSeats = categories.reduce((sum, category) => sum + category.totalSeats, 0);
-  const availableSeats = categories.reduce((sum, category) => sum + category.availableSeats, 0);
-  const soldSeats = categories.reduce((sum, category) => sum + category.soldSeats, 0);
-  const gross = categories.reduce(
+  const normalizedCategories = applySaiChitraBlockedSeats(categories);
+  const totalSeats = normalizedCategories.reduce((sum, category) => sum + category.totalSeats, 0);
+  const availableSeats = normalizedCategories.reduce((sum, category) => sum + category.availableSeats, 0);
+  const soldSeats = normalizedCategories.reduce((sum, category) => sum + category.soldSeats, 0);
+  const blockedSeats = normalizedCategories.reduce((sum, category) => sum + category.blockedSeats, 0);
+  const rawUnavailableSeats = normalizedCategories.reduce((sum, category) => sum + category.rawSoldSeats, 0);
+  const gross = normalizedCategories.reduce(
     (sum, category) => sum + category.soldSeats * netTicketPrice(category.price),
     0
   );
+  const blockedGross = normalizedCategories.reduce((sum, category) => sum + category.blockedGross, 0);
   const contentId = movie?.contentId || session.contentId || session.mid || "unknown";
   const formatId = String(session.fid || "").toLowerCase();
   const encSessionId =
@@ -329,16 +373,19 @@ function buildShowFromCategories({ session, movie, categories, theatrePageUrl })
     seatLayoutUrl: `https://ticketnew.com/movies/seat-layout/${formatId}?encsessionid=${encodeURIComponent(
       encSessionId
     )}&freeseating=false&fromsessions=true&type=CINEMAS&contentid=${contentId}`,
-    categories: categories.map((category) => ({
-      ...category,
-      netPrice: netTicketPrice(category.price)
-    })),
+    categories: normalizedCategories,
     totalSeats,
     availableSeats,
     soldSeats,
+    blockedSeats,
+    blockedGross,
+    rawUnavailableSeats,
     unknownSeats: 0,
     gross,
     occupancyPercent: totalSeats ? Number(((soldSeats / totalSeats) * 100).toFixed(2)) : 0,
+    notes: [
+      `${SAI_CHITRA_DEFAULT_BLOCKED_SEATS_PER_SHOW} default Sai Chitra blocked seats are excluded from sold tickets and gross.`
+    ],
     source: {
       method: "ticketnew-seat-layout",
       platform: "ticketnew",

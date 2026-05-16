@@ -80,6 +80,38 @@ function categoryBreakdown(show) {
   return parts.length ? parts.join(" + ") : "Seat-category split unavailable";
 }
 
+function blockedSeats(show) {
+  return Number(show.blockedSeats || 0);
+}
+
+function blockedGross(show) {
+  return Number(show.blockedGross || 0);
+}
+
+function soldWithBlockedLabel(show) {
+  const blocked = blockedSeats(show);
+  const sold = ticketLabel(show.soldSeats);
+  return blocked ? `${sold} sold + ${ticketLabel(blocked)} blocked` : sold;
+}
+
+function grossWithBlockedLabel(show) {
+  const blocked = blockedGross(show);
+  const gross = currency(showGross(show));
+  return blocked ? `${gross} sold gross + ${currency(blocked)} blocked` : gross;
+}
+
+function blockedBreakdown(show) {
+  const categories = Array.isArray(show.categories) ? show.categories : [];
+  const parts = categories
+    .filter((category) => Number(category.blockedSeats || 0) > 0)
+    .map((category) => {
+      const price = Number(category.price || 0);
+      return `${number(category.blockedSeats)} x ₹${netTicketPrice(price)} blocked (${price ? `₹${price} ticket` : category.label})`;
+    });
+
+  return parts.length ? `Blocked seats: ${parts.join(" + ")}` : "";
+}
+
 async function fetchJson(url) {
   const response = await fetch(url, { cache: "no-store" });
   if (!response.ok) {
@@ -1092,10 +1124,11 @@ function MovieWiseBoard({ shows, emptyMessage }) {
                   {show.theatreShortName} - {show.showTimeLabel} - {movieLabelFromShow(show)}
                 </p>
                 <p className="movie-line__result">
-                  {ticketLabel(show.soldSeats)} Booked - {number(show.availableSeats)} available ·{" "}
-                  {currency(showGross(show))} gross
+                  {soldWithBlockedLabel(show)} - {number(show.availableSeats)} available ·{" "}
+                  {currency(showGross(show))} sold gross
                 </p>
                 <p className="movie-line__meta">{categoryBreakdown(show)}</p>
+                {blockedSeats(show) ? <p className="movie-line__blocked">{blockedBreakdown(show)}</p> : null}
               </div>
             ))}
           </div>
@@ -1121,8 +1154,10 @@ function ShowCards({ shows, emptyMessage }) {
           <div className="show-card__numbers">
             <strong>{ticketLabel(show.soldSeats)}</strong>
             <span>{currency(showGross(show))}</span>
+            {blockedSeats(show) ? <em>{ticketLabel(blockedSeats(show))} blocked</em> : null}
           </div>
           <p className="show-card__meta">{categoryBreakdown(show)}</p>
+          {blockedSeats(show) ? <p className="show-card__blocked">{blockedBreakdown(show)}</p> : null}
           <p className="show-card__meta">
             {number(show.availableSeats)} available · {percent(show.occupancyPercent)} occupancy
           </p>
@@ -1634,7 +1669,7 @@ function LiveTrackingScreen({ screenSwitcher }) {
             {
               key: "soldSeats",
               label: "Tickets",
-              render: (show) => ticketLabel(show.soldSeats)
+              render: (show) => soldWithBlockedLabel(show)
             },
             {
               key: "availableSeats",
@@ -1654,7 +1689,7 @@ function LiveTrackingScreen({ screenSwitcher }) {
             {
               key: "gross",
               label: "Gross",
-              render: (show) => currency(showGross(show))
+              render: (show) => grossWithBlockedLabel(show)
             }
           ]}
           rows={filteredShows}
