@@ -14,6 +14,7 @@ const PUBLISHED_BOXOFFICE_BASE =
 const BOXOFFICE_INGEST_AUDIENCE = "mpltracking-boxoffice-ingest";
 const INDIA_TIMEZONE = "Asia/Kolkata";
 const ACTIVE_THEATRES = new Set(["RTDM", "MSDR", "ASRM", "SKMD", "SAIC"]);
+const TICKETNEW_THEATRES = new Set(["SAIC"]);
 const CAPTURE_POLICY = {
   RTDM: {
     fallbackCaptureAfterMinutes: 25,
@@ -226,14 +227,28 @@ async function fetchPublishedBoxoffice(isoDate) {
   }
 }
 
-async function fetchLiveTheatreSnapshot(liveApiBase, targetDate, venueCode) {
+function buildLiveSnapshotUrl({ liveApiBase, targetDate, venueCode = "", isTicketNew = false, bulkMirror = false }) {
   const url = new URL(`${liveApiBase}/api/live`);
   url.searchParams.set("date", targetDate.isoDate);
-  url.searchParams.set("venueCode", venueCode);
   url.searchParams.set("strict", "1");
+  url.searchParams.set("mirrorRetryRounds", isTicketNew ? "1" : "3");
+  if (venueCode) {
+    url.searchParams.set("venueCode", venueCode);
+  }
+  if (!isTicketNew || bulkMirror) {
+    url.searchParams.set("mirrorOnly", "1");
+  }
   url.searchParams.set("ts", String(Date.now()));
+  return url;
+}
 
-  const response = await fetch(url, { headers: { accept: "application/json" } });
+async function fetchLiveSnapshotUrl({ url, targetDate, isTicketNew }) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), isTicketNew ? 15000 : 25000);
+  const response = await fetch(url, {
+    signal: controller.signal,
+    headers: { accept: "application/json" }
+  }).finally(() => clearTimeout(timeout));
   const text = await response.text();
   if (!response.ok) {
     throw new Error(`${response.status} ${response.statusText}: ${text.slice(0, 180)}`);
@@ -245,6 +260,43 @@ async function fetchLiveTheatreSnapshot(liveApiBase, targetDate, venueCode) {
   }
 
   return data;
+}
+
+async function fetchLiveTheatreSnapshot(liveApiBase, targetDate, venueCode) {
+  const normalizedVenueCode = String(venueCode || "").toUpperCase();
+  const isTicketNew = TICKETNEW_THEATRES.has(normalizedVenueCode);
+  const directUrl = buildLiveSnapshotUrl({
+    liveApiBase,
+    targetDate,
+    venueCode: normalizedVenueCode,
+    isTicketNew
+  });
+
+  try {
+    return await fetchLiveSnapshotUrl({ url: directUrl, targetDate, isTicketNew });
+  } catch (error) {
+    if (isTicketNew) throw error;
+
+    const bulkUrl = buildLiveSnapshotUrl({
+      liveApiBase,
+      targetDate,
+      isTicketNew: false,
+      bulkMirror: true
+    });
+    const bulkData = await fetchLiveSnapshotUrl({ url: bulkUrl, targetDate, isTicketNew: false });
+    const shows = (bulkData.shows || []).filter((show) => show.venueCode === normalizedVenueCode);
+    if (!shows.length) throw error;
+
+    return {
+      ...bulkData,
+      shows,
+      meta: {
+        ...(bulkData.meta || {}),
+        boxofficeFallback: "bulk-mirror-filtered",
+        selectedVenueCode: normalizedVenueCode
+      }
+    };
+  }
 }
 
 async function publishRemoteBoxoffice(liveApiBase, data) {
