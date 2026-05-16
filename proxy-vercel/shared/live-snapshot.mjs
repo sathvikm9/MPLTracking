@@ -900,6 +900,51 @@ async function mergeSaiChitraLiveSnapshot(output, { date, fetchImpl }) {
   }
 }
 
+async function buildCatalogLiveSnapshotWithVenueFallback({
+  date,
+  venueCode,
+  fetchImpl,
+  snapshotBaseUrl,
+  allowLastGoodCache,
+  retryRounds
+}) {
+  try {
+    return await buildCatalogLiveSnapshot({
+      date,
+      venueCode,
+      fetchImpl,
+      snapshotBaseUrl,
+      allowLastGoodCache,
+      retryRounds
+    });
+  } catch (error) {
+    if (!venueCode || isSaiChitraVenue(venueCode)) throw error;
+
+    const bulkOutput = await buildCatalogLiveSnapshot({
+      date,
+      venueCode: "",
+      fetchImpl,
+      snapshotBaseUrl,
+      allowLastGoodCache,
+      retryRounds
+    });
+    const filteredOutput = filterOutputByVenueCode(bulkOutput, venueCode);
+    if (!filteredOutput.shows?.length) throw error;
+
+    return {
+      ...filteredOutput,
+      meta: {
+        ...(filteredOutput.meta || {}),
+        boxofficeFallback: "bulk-mirror-filtered",
+        notes: [
+          `Selected theatre mirror failed, so ${venueCode} was filtered from the all-theatres live mirror.`,
+          ...((filteredOutput.meta && filteredOutput.meta.notes) || [])
+        ]
+      }
+    };
+  }
+}
+
 async function discoverLiveShowsForDate({
   fetchImpl,
   snapshotBaseUrl,
@@ -1299,7 +1344,7 @@ export async function buildLiveSnapshot({
 
   if (mirrorOnly) {
     try {
-      const output = await buildCatalogLiveSnapshot({
+      const output = await buildCatalogLiveSnapshotWithVenueFallback({
         date,
         venueCode,
         fetchImpl,

@@ -867,12 +867,17 @@ function useDashboardData(selectedDate, selectedTheatre) {
 
     const buildLiveUrl = (params = {}) => {
       const liveUrl = new URL(`${liveApiBase}/api/live`);
+      const useBulkBmsMirror =
+        params.mirrorOnly &&
+        selectedTheatre !== "ALL" &&
+        selectedTheatre !== "SAIC";
+
       liveUrl.searchParams.set("date", selectedDate);
       liveUrl.searchParams.set("liveOnly", "1");
       liveUrl.searchParams.set("allowCache", "0");
       liveUrl.searchParams.set("ts", String(Date.now()));
 
-      if (selectedTheatre !== "ALL") {
+      if (selectedTheatre !== "ALL" && !useBulkBmsMirror) {
         liveUrl.searchParams.set("venueCode", selectedTheatre);
       }
 
@@ -885,12 +890,12 @@ function useDashboardData(selectedDate, selectedTheatre) {
 
     const attempts = [
       {
-        mode: "live-proxy-theatre-first",
-        url: buildLiveUrl({ mirrorRetryRounds: 4 })
+        mode: "live-proxy-mirror-retry",
+        url: buildLiveUrl({ mirrorOnly: 1, mirrorRetryRounds: 3 })
       },
       {
-        mode: "live-proxy-mirror-retry",
-        url: buildLiveUrl({ mirrorOnly: 1, mirrorRetryRounds: 6 })
+        mode: "live-proxy-theatre-backup",
+        url: buildLiveUrl({ mirrorRetryRounds: 2 })
       }
     ];
     let lastError = null;
