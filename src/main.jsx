@@ -94,10 +94,26 @@ function soldWithBlockedLabel(show) {
   return blocked ? `${sold} sold + ${ticketLabel(blocked)} blocked` : sold;
 }
 
+function ledgerTicketsLabel(show) {
+  const blocked = blockedSeats(show);
+  return blocked ? `${number(show.soldSeats)} sold + ${number(blocked)} blocked` : number(show.soldSeats);
+}
+
 function grossWithBlockedLabel(show) {
   const blocked = blockedGross(show);
   const gross = currency(showGross(show));
   return blocked ? `${gross} sold gross + ${currency(blocked)} blocked` : gross;
+}
+
+function ledgerGrossLabel(show) {
+  const blocked = blockedGross(show);
+  const gross = currency(showGross(show));
+  return blocked ? `${gross} sold + ${currency(blocked)} blocked` : gross;
+}
+
+function movieLineTicketsLabel(show) {
+  const blocked = blockedSeats(show);
+  return blocked ? `${ticketLabel(show.soldSeats)} sold + ${number(blocked)} Blocked` : `${ticketLabel(show.soldSeats)} Booked`;
 }
 
 function blockedBreakdown(show) {
@@ -1124,7 +1140,7 @@ function MovieWiseBoard({ shows, emptyMessage }) {
                   {show.theatreShortName} - {show.showTimeLabel} - {movieLabelFromShow(show)}
                 </p>
                 <p className="movie-line__result">
-                  {soldWithBlockedLabel(show)} - {number(show.availableSeats)} available ·{" "}
+                  {movieLineTicketsLabel(show)} - {number(show.availableSeats)} available ·{" "}
                   {currency(showGross(show))} sold gross
                 </p>
                 <p className="movie-line__meta">{categoryBreakdown(show)}</p>
@@ -1669,7 +1685,7 @@ function LiveTrackingScreen({ screenSwitcher }) {
             {
               key: "soldSeats",
               label: "Tickets",
-              render: (show) => soldWithBlockedLabel(show)
+              render: (show) => ledgerTicketsLabel(show)
             },
             {
               key: "availableSeats",
@@ -1689,7 +1705,7 @@ function LiveTrackingScreen({ screenSwitcher }) {
             {
               key: "gross",
               label: "Gross",
-              render: (show) => grossWithBlockedLabel(show)
+              render: (show) => ledgerGrossLabel(show)
             }
           ]}
           rows={filteredShows}
