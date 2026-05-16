@@ -1,5 +1,9 @@
 import { fetchMadanapalleShowtimesPayload } from "./madanapalle-showtimes.mjs";
 import {
+  fetchSaiChitraTicketNewShows,
+  SAI_CHITRA_THEATRE
+} from "./ticketnew-live.mjs";
+import {
   discoverTheatreDates,
   discoverTheatreDateShows,
   MADANAPALLE_THEATRES
@@ -54,6 +58,7 @@ const eventCatalogCache = globalThis.__MADANAPALLE_EVENT_CATALOG_CACHE__ || {
   movies: []
 };
 globalThis.__MADANAPALLE_EVENT_CATALOG_CACHE__ = eventCatalogCache;
+const ALL_TRACKING_THEATRES = [...MADANAPALLE_THEATRES, SAI_CHITRA_THEATRE];
 
 const MADANAPALLE_VISIBLE_DATE_SEEDS = [
   ["RTDM", "2026-05-15", 4, "Veerabhadrudu"],
@@ -162,6 +167,10 @@ function addDaysIso(dateIso, days) {
   const [year, month, day] = String(dateIso).split("-").map(Number);
   const date = new Date(Date.UTC(year, month - 1, day + days));
   return date.toISOString().slice(0, 10);
+}
+
+function isSaiChitraVenue(venueCode) {
+  return String(venueCode || "").toUpperCase() === SAI_CHITRA_THEATRE.venueCode;
 }
 
 function normalizeMovieGenres(eventGenre) {
@@ -792,12 +801,103 @@ function buildDiscoveryBaseline(seedBaseline, targetDate) {
       timezone: "Asia/Kolkata"
     },
     shows: [],
-    theatres: MADANAPALLE_THEATRES,
+    theatres: ALL_TRACKING_THEATRES,
     meta: {
       ...(seedBaseline?.meta || {}),
       status: "ok"
     }
   };
+}
+
+async function buildSaiChitraLiveSnapshot({ date, fetchImpl }) {
+  const discovered = await fetchSaiChitraTicketNewShows({
+    date,
+    fetchImpl
+  });
+  const output = buildOutputFromBaseline(
+    buildDiscoveryBaseline(null, date),
+    discovered.shows || [],
+    []
+  );
+
+  return {
+    ...output,
+    meta: {
+      ...(output.meta || {}),
+      source: "ticketnew-theatre-page",
+      platform: "ticketnew",
+      liveDiscovery: true,
+      selectedVenueCode: SAI_CHITRA_THEATRE.venueCode,
+      ticketNew: discovered.meta,
+      liveRefresh: {
+        attemptedEvents: 1,
+        successfulEvents: 1,
+        failedEvents: 0,
+        failedEventCodes: [],
+        cachedEvents: 0,
+        cachedEventCodes: [],
+        liveShowCount: output.shows.length,
+        fallbackShowCount: 0
+      }
+    }
+  };
+}
+
+async function mergeSaiChitraLiveSnapshot(output, { date, fetchImpl }) {
+  try {
+    const saiChitraOutput = await buildSaiChitraLiveSnapshot({
+      date,
+      fetchImpl
+    });
+    const shows = [...(output.shows || []), ...(saiChitraOutput.shows || [])];
+    const notes = [
+      ...((output.meta && output.meta.notes) || []),
+      ...((saiChitraOutput.meta && saiChitraOutput.meta.notes) || [])
+    ];
+    const merged = buildOutputFromBaseline(buildDiscoveryBaseline(null, date), shows, notes);
+
+    return {
+      ...merged,
+      meta: {
+        ...(output.meta || {}),
+        status: "ok",
+        notes,
+        liveProxy: true,
+        mixedPlatforms: true,
+        ticketNew: saiChitraOutput.meta?.ticketNew,
+        liveRefresh: {
+          ...(output.meta?.liveRefresh || {}),
+          attemptedEvents:
+            Number(output.meta?.liveRefresh?.attemptedEvents || 0) +
+            Number(saiChitraOutput.meta?.liveRefresh?.attemptedEvents || 0),
+          successfulEvents:
+            Number(output.meta?.liveRefresh?.successfulEvents || 0) +
+            Number(saiChitraOutput.meta?.liveRefresh?.successfulEvents || 0),
+          failedEvents: Number(output.meta?.liveRefresh?.failedEvents || 0),
+          failedEventCodes: output.meta?.liveRefresh?.failedEventCodes || [],
+          liveShowCount:
+            Number(output.meta?.liveRefresh?.liveShowCount || 0) +
+            Number(saiChitraOutput.meta?.liveRefresh?.liveShowCount || 0),
+          fallbackShowCount: Number(output.meta?.liveRefresh?.fallbackShowCount || 0)
+        }
+      }
+    };
+  } catch (error) {
+    return {
+      ...output,
+      meta: {
+        ...(output.meta || {}),
+        notes: [
+          ...((output.meta && output.meta.notes) || []),
+          `Sai Chitra TicketNew live fetch failed: ${error.message}`
+        ],
+        ticketNew: {
+          status: "error",
+          error: error.message
+        }
+      }
+    };
+  }
 }
 
 async function discoverLiveShowsForDate({
@@ -1190,9 +1290,16 @@ export async function buildLiveSnapshot({
   );
   let baseline;
 
+  if (isSaiChitraVenue(venueCode)) {
+    return buildSaiChitraLiveSnapshot({
+      date,
+      fetchImpl
+    });
+  }
+
   if (mirrorOnly) {
     try {
-      return await buildCatalogLiveSnapshot({
+      const output = await buildCatalogLiveSnapshot({
         date,
         venueCode,
         fetchImpl,
@@ -1200,6 +1307,7 @@ export async function buildLiveSnapshot({
         allowLastGoodCache,
         retryRounds: mirrorRetryRounds
       });
+      return venueCode ? output : mergeSaiChitraLiveSnapshot(output, { date, fetchImpl });
     } catch (error) {
       if (strictLiveOnly) {
         throw new Error(`Live mirror fallback failed: ${error.message}`);
@@ -1208,12 +1316,13 @@ export async function buildLiveSnapshot({
   }
 
   try {
-    return await buildTheatreLiveSnapshot({
+    const output = await buildTheatreLiveSnapshot({
       date,
       venueCode,
       fetchImpl,
       allowLastGoodCache
     });
+    return venueCode ? output : mergeSaiChitraLiveSnapshot(output, { date, fetchImpl });
   } catch (error) {
     try {
       const output = await buildCatalogLiveSnapshot({
@@ -1225,7 +1334,7 @@ export async function buildLiveSnapshot({
         retryRounds: mirrorRetryRounds
       });
 
-      return {
+      const fallbackOutput = {
         ...output,
         meta: {
           ...(output.meta || {}),
@@ -1235,6 +1344,9 @@ export async function buildLiveSnapshot({
           ]
         }
       };
+      return venueCode
+        ? fallbackOutput
+        : mergeSaiChitraLiveSnapshot(fallbackOutput, { date, fetchImpl });
     } catch (catalogError) {
       if (strictLiveOnly) {
         throw new Error(
@@ -1287,19 +1399,23 @@ export async function buildLiveSnapshot({
       eventCodes: catalog.eventCodes
     });
 
-    if (discovered.shows.length) return discovered;
+    if (discovered.shows.length) {
+      return venueCode ? discovered : mergeSaiChitraLiveSnapshot(discovered, { date, fetchImpl });
+    }
 
-    return filterOutputByVenueCode(
+    const emptyOutput = filterOutputByVenueCode(
       buildEmptyOutputFromBaseline(latestBaseline, date, [
         `No published baseline was found for ${date}.`,
         "Live discovery found no BookMyShow shows for the selected date."
       ]),
       venueCode
     );
+    return venueCode ? emptyOutput : mergeSaiChitraLiveSnapshot(emptyOutput, { date, fetchImpl });
   }
 
   const scopedBaseline = filterBaselineByVenueCode(baseline, venueCode);
-  return filterOutputByVenueCode(await refreshLiveSnapshot(scopedBaseline, fetchImpl), venueCode);
+  const refreshed = filterOutputByVenueCode(await refreshLiveSnapshot(scopedBaseline, fetchImpl), venueCode);
+  return venueCode ? refreshed : mergeSaiChitraLiveSnapshot(refreshed, { date, fetchImpl });
 }
 
 function summarizeShowsByTheatre(shows) {

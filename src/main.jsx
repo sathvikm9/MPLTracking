@@ -20,6 +20,7 @@ const THEATRE_OPTIONS = [
   { value: "SKMD", label: "Sri Krishna" },
   { value: "MSDR", label: "Siddartha" },
   { value: "ASRM", label: "ASR" },
+  { value: "SAIC", label: "Sai Chitra" },
   { value: "ALL", label: "All Theatres" }
 ];
 const THEATRE_BY_CODE = new Map(THEATRE_OPTIONS.map((option) => [option.value, option.label]));
@@ -642,9 +643,13 @@ function dashboardCacheKey(selectedDate, selectedTheatre) {
 
 function hasLiveSeatCounts(data) {
   return (data?.shows || []).some((show) =>
-    ["bookmyshow-theatre-page", "live-proxy-showtimes", "live-proxy-discovery", "movie-event-showtimes"].includes(
-      show.source?.method
-    ) && Number(show.totalSeats || 0) > 0
+    [
+      "bookmyshow-theatre-page",
+      "live-proxy-showtimes",
+      "live-proxy-discovery",
+      "movie-event-showtimes",
+      "ticketnew-seat-layout"
+    ].includes(show.source?.method) && Number(show.totalSeats || 0) > 0
   );
 }
 
