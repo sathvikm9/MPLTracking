@@ -1,8 +1,9 @@
 import { getIndiaTodayIso, isoToDateCode, MADANAPALLE_THEATRES } from "./theatre-discovery.mjs";
+import { SAI_CHITRA_THEATRE } from "./ticketnew-live.mjs";
 import { readBoxofficeSnapshot, writeBoxofficeSnapshot } from "./upstash-boxoffice.mjs";
 
 const INDIA_TIMEZONE = "Asia/Kolkata";
-const ACTIVE_THEATRES = new Set(["RTDM", "MSDR", "ASRM", "SKMD"]);
+const ACTIVE_THEATRES = new Set(["RTDM", "MSDR", "ASRM", "SKMD", "SAIC"]);
 const CITY = {
   name: "Madanapalle",
   regionCode: "MDNP",
@@ -32,6 +33,12 @@ const CAPTURE_POLICY = {
     fallbackCaptureAfterMinutes: 12,
     captureBeforeCutoffMinutes: 3,
     note: "Sri Krishna captures about 3 minutes before the 15-minute cutoff."
+  },
+  SAIC: {
+    fallbackCaptureAfterMinutes: -3,
+    captureBeforeCutoffMinutes: 0,
+    includeBlockedSeatsInBoxoffice: true,
+    note: "Sai Chitra TicketNew shows can disappear at showtime, so capture starts before showtime."
   }
 };
 
@@ -176,9 +183,23 @@ function summarizeByMovie(shows) {
 
 function normalizeShowForCapture(show, capturedAt, captureAt, policy) {
   const categories = Array.isArray(show.categories) ? show.categories : [];
-  const gross = showGross(show);
+  const includeBlockedSeats = Boolean(policy.includeBlockedSeatsInBoxoffice);
+  const normalizedCategories = categories.map((category) => ({
+    ...category,
+    soldSeats: includeBlockedSeats ? number(category.rawSoldSeats ?? category.soldSeats) : number(category.soldSeats),
+    actualSoldSeats: number(category.soldSeats),
+    netPrice: Math.max(number(category.price) - 5, 0)
+  }));
+  const gross = includeBlockedSeats
+    ? normalizedCategories.reduce(
+        (sum, category) => sum + number(category.soldSeats) * Math.max(number(category.price) - 5, 0),
+        0
+      )
+    : showGross(show);
   const totalSeats = number(show.totalSeats);
-  const soldSeats = number(show.soldSeats);
+  const actualSoldSeats = number(show.soldSeats);
+  const blockedSeats = number(show.blockedSeats);
+  const soldSeats = includeBlockedSeats ? actualSoldSeats + blockedSeats : actualSoldSeats;
 
   return {
     ...show,
@@ -186,12 +207,12 @@ function normalizeShowForCapture(show, capturedAt, captureAt, policy) {
     captureAt,
     capturedAt,
     capturePolicy: policy,
-    categories: categories.map((category) => ({
-      ...category,
-      netPrice: Math.max(number(category.price) - 5, 0)
-    })),
+    categories: normalizedCategories,
+    actualSoldSeats,
+    soldSeats,
     gross,
     occupancyPercent: totalSeats ? Number(((soldSeats / totalSeats) * 100).toFixed(2)) : 0,
+    boxofficeIncludesBlockedSeats: includeBlockedSeats,
     boxofficeSource: {
       method: "vercel-scheduled-cutoff-capture",
       capturedAt
@@ -262,7 +283,9 @@ export async function collectBoxofficeSnapshot({
   const capturesByKey = new Map((existing?.captures || []).map((show) => [show.key || captureKey(show), show]));
   const plannedByKey = new Map((existing?.plannedShows || []).map((show) => [show.key || captureKey(show), show]));
   const errors = [];
-  const theatres = MADANAPALLE_THEATRES.filter((theatre) => ACTIVE_THEATRES.has(theatre.venueCode));
+  const theatres = [...MADANAPALLE_THEATRES, SAI_CHITRA_THEATRE].filter((theatre) =>
+    ACTIVE_THEATRES.has(theatre.venueCode)
+  );
 
   await Promise.all(
     theatres.map(async (theatre) => {

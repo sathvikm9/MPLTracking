@@ -13,7 +13,7 @@ const PUBLISHED_BOXOFFICE_BASE =
   "https://sathvikm9.github.io/MPLTracking/data/boxoffice";
 const BOXOFFICE_INGEST_AUDIENCE = "mpltracking-boxoffice-ingest";
 const INDIA_TIMEZONE = "Asia/Kolkata";
-const ACTIVE_THEATRES = new Set(["RTDM", "MSDR", "ASRM", "SKMD"]);
+const ACTIVE_THEATRES = new Set(["RTDM", "MSDR", "ASRM", "SKMD", "SAIC"]);
 const CAPTURE_POLICY = {
   RTDM: {
     fallbackCaptureAfterMinutes: 25,
@@ -34,6 +34,12 @@ const CAPTURE_POLICY = {
     fallbackCaptureAfterMinutes: 12,
     captureBeforeCutoffMinutes: 3,
     note: "Sri Krishna cutoff is 15 minutes after showtime, so capture about 3 minutes before cutoff."
+  },
+  SAIC: {
+    fallbackCaptureAfterMinutes: -3,
+    captureBeforeCutoffMinutes: 0,
+    includeBlockedSeatsInBoxoffice: true,
+    note: "Sai Chitra TicketNew shows can disappear at showtime, so capture starts before showtime."
   }
 };
 
@@ -296,9 +302,23 @@ async function getGithubActionsOidcToken() {
 
 function normalizeShowForCapture(show, capturedAt, captureAt, policy) {
   const categories = Array.isArray(show.categories) ? show.categories : [];
-  const gross = showGross(show);
+  const includeBlockedSeats = Boolean(policy.includeBlockedSeatsInBoxoffice);
+  const normalizedCategories = categories.map((category) => ({
+    ...category,
+    soldSeats: includeBlockedSeats ? number(category.rawSoldSeats ?? category.soldSeats) : number(category.soldSeats),
+    actualSoldSeats: number(category.soldSeats),
+    netPrice: Math.max(number(category.price) - 5, 0)
+  }));
+  const gross = includeBlockedSeats
+    ? normalizedCategories.reduce(
+        (sum, category) => sum + number(category.soldSeats) * Math.max(number(category.price) - 5, 0),
+        0
+      )
+    : showGross(show);
   const totalSeats = number(show.totalSeats);
-  const soldSeats = number(show.soldSeats);
+  const actualSoldSeats = number(show.soldSeats);
+  const blockedSeats = number(show.blockedSeats);
+  const soldSeats = includeBlockedSeats ? actualSoldSeats + blockedSeats : actualSoldSeats;
 
   return {
     ...show,
@@ -306,12 +326,12 @@ function normalizeShowForCapture(show, capturedAt, captureAt, policy) {
     captureAt,
     capturedAt,
     capturePolicy: policy,
-    categories: categories.map((category) => ({
-      ...category,
-      netPrice: Math.max(number(category.price) - 5, 0)
-    })),
+    categories: normalizedCategories,
+    actualSoldSeats,
+    soldSeats,
     gross,
     occupancyPercent: totalSeats ? Number(((soldSeats / totalSeats) * 100).toFixed(2)) : 0,
+    boxofficeIncludesBlockedSeats: includeBlockedSeats,
     boxofficeSource: {
       method: "scheduled-live-cutoff-capture",
       capturedAt

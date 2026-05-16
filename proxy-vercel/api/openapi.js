@@ -38,7 +38,7 @@ function buildOpenApiSpec(req) {
         description: "Raw BookMyShow mirror payload checks by event code"
       },
       {
-        name: "Live boxoffice",
+        name: "Boxoffice",
         description: "Stored boxoffice snapshots and scheduled cutoff collection"
       },
       {
@@ -70,10 +70,10 @@ function buildOpenApiSpec(req) {
               in: "query",
               required: false,
               description:
-                "Optional theatre code. Leave empty for all theatres. Active values: RTDM Ravi, ASRM ASR, MSDR Siddartha, SKMD Sri Krishna.",
+                "Optional theatre code. Leave empty for all theatres. Active values: RTDM Ravi, ASRM ASR, MSDR Siddartha, SKMD Sri Krishna, SAIC Sai Chitra.",
               schema: {
                 type: "string",
-                enum: ["RTDM", "ASRM", "MSDR", "SKMD"]
+                enum: ["RTDM", "ASRM", "MSDR", "SKMD", "SAIC"]
               },
               example: "RTDM"
             },
@@ -138,10 +138,10 @@ function buildOpenApiSpec(req) {
               in: "query",
               required: false,
               description:
-                "Optional theatre code. Leave empty for all theatres. Active values: RTDM Ravi, ASRM ASR, MSDR Siddartha, SKMD Sri Krishna.",
+                "Optional theatre code. Leave empty for all theatres. Active values: RTDM Ravi, ASRM ASR, MSDR Siddartha, SKMD Sri Krishna, SAIC Sai Chitra.",
               schema: {
                 type: "string",
-                enum: ["RTDM", "ASRM", "MSDR", "SKMD"]
+                enum: ["RTDM", "ASRM", "MSDR", "SKMD", "SAIC"]
               },
               example: "RTDM"
             },
@@ -253,7 +253,7 @@ function buildOpenApiSpec(req) {
               description: "Optional theatre filter.",
               schema: {
                 type: "string",
-                enum: ["RTDM", "ASRM", "MSDR", "SKMD"]
+                enum: ["RTDM", "ASRM", "MSDR", "SKMD", "SAIC"]
               },
               example: "RTDM"
             },
@@ -298,7 +298,7 @@ function buildOpenApiSpec(req) {
       },
       "/api/boxoffice": {
         get: {
-          tags: ["Live boxoffice"],
+          tags: ["Boxoffice"],
           summary: "Read stored live boxoffice snapshot",
           description: "Reads the selected date's captured boxoffice result from Upstash Redis.",
           parameters: [
@@ -326,7 +326,7 @@ function buildOpenApiSpec(req) {
       },
       "/api/boxoffice-collect": {
         get: {
-          tags: ["Live boxoffice"],
+          tags: ["Boxoffice"],
           summary: "Run live boxoffice collector",
           description:
             "Fetches fresh live data for Madanapalle theatres, captures shows whose cutoff capture time is due, and writes directly to Upstash Redis. Intended for a minute-level scheduler such as Upstash QStash.",

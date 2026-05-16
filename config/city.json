@@ -37,6 +37,15 @@
       "fallbackCutoffMinutes": 15
     },
     {
+      "name": "Sai Chitra Theatre A/C 4K Laser Dolby Surround 7: Madanapalle",
+      "shortName": "Sai Chitra",
+      "venueCode": "SAIC",
+      "slug": "sai-chitra-theatre-a-c-4k-laser-dolby-surround-7-madanapalle-c",
+      "platform": "ticketnew",
+      "cinemaId": 4903,
+      "fallbackCutoffMinutes": -3
+    },
+    {
       "name": "Sunil A/C 4K Laser Dolby Surround 7.1: Madanapalle",
       "shortName": "Sunil",
       "venueCode": "SUTD",

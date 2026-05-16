@@ -116,6 +116,20 @@ function movieLineTicketsLabel(show) {
   return blocked ? `${ticketLabel(show.soldSeats)} sold + ${number(blocked)} Blocked` : `${ticketLabel(show.soldSeats)} Booked`;
 }
 
+function boxofficeTicketLabel(show) {
+  const blocked = blockedSeats(show);
+  return show.boxofficeIncludesBlockedSeats && blocked
+    ? `${number(show.soldSeats)} (${number(blocked)} blocked)`
+    : ticketLabel(show.soldSeats);
+}
+
+function boxofficeGrossLabel(show) {
+  const blocked = blockedGross(show);
+  return show.boxofficeIncludesBlockedSeats && blocked
+    ? `${currency(showGross(show))} (${currency(blocked)} blocked)`
+    : currency(showGross(show));
+}
+
 function blockedBreakdown(show) {
   const categories = Array.isArray(show.categories) ? show.categories : [];
   const parts = categories
@@ -1198,7 +1212,7 @@ function ScreenSwitcher({ activeScreen, onChange }) {
         type="button"
         onClick={() => onChange("boxoffice")}
       >
-        Live Boxoffice
+        Boxoffice
       </button>
     </nav>
   );
@@ -1219,7 +1233,7 @@ function BoxofficeScreen({ screenSwitcher }) {
       : error
         ? "Boxoffice file is not available right now. Please try again after the next scheduled run."
         : isBusy
-          ? "Loading Live Boxoffice..."
+          ? "Loading Boxoffice..."
           : `No boxoffice captures yet for ${formatSelectedDateLabel(selectedDate)}.`;
 
   return (
@@ -1228,7 +1242,7 @@ function BoxofficeScreen({ screenSwitcher }) {
 
       <section className="hero hero--boxoffice">
         <div className="hero__content">
-          <p className="hero__eyebrow">Madanapalle Live Boxoffice</p>
+          <p className="hero__eyebrow">Madanapalle Boxoffice</p>
 
           <div className="selector-shell">
             <label className="selector-select-shell selector-select-shell--date">
@@ -1250,7 +1264,7 @@ function BoxofficeScreen({ screenSwitcher }) {
             {isBusy ? <span className="status-spinner" aria-hidden="true" /> : null}
             <span>
               {isBusy
-                ? "Loading scheduled boxoffice captures..."
+                ? "Loading boxoffice captures..."
                 : error
                   ? emptyMessage
                   : `${number(captures.length)} cut-off show captures loaded.`}
@@ -1409,8 +1423,8 @@ function BoxofficeScreen({ screenSwitcher }) {
             { key: "theatreShortName", label: "Theatre" },
             { key: "showTimeLabel", label: "Time" },
             { key: "movie", label: "Movie", render: (show) => movieLabelFromShow(show) },
-            { key: "soldSeats", label: "Tickets", render: (show) => ticketLabel(show.soldSeats) },
-            { key: "gross", label: "Gross", render: (show) => currency(showGross(show)) },
+            { key: "soldSeats", label: "Tickets", render: (show) => boxofficeTicketLabel(show) },
+            { key: "gross", label: "Gross", render: (show) => boxofficeGrossLabel(show) },
             { key: "occupancyPercent", label: "Occ", render: (show) => percent(show.occupancyPercent) },
             { key: "capturedAt", label: "Captured", render: (show) => formatGeneratedAt({ generatedAt: show.capturedAt }) }
           ]}
