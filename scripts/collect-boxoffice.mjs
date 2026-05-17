@@ -14,8 +14,6 @@ const PUBLISHED_BOXOFFICE_BASE =
 const BOXOFFICE_INGEST_AUDIENCE = "mpltracking-boxoffice-ingest";
 const INDIA_TIMEZONE = "Asia/Kolkata";
 const ACTIVE_THEATRES = new Set(["RTDM", "MSDR", "ASRM", "SKMD", "SAIC"]);
-const TICKETNEW_THEATRES = new Set(["SAIC"]);
-const BOOKMYSHOW_THEATRES = new Set(["RTDM", "MSDR", "ASRM", "SKMD"]);
 const CAPTURE_POLICY = {
   RTDM: {
     fallbackCaptureAfterMinutes: 25,
@@ -98,6 +96,45 @@ function resolveCaptureAt(show, policy) {
   }
 
   return addMinutesToShowIso(show.showDateTime, policy.fallbackCaptureAfterMinutes);
+}
+
+function validDate(value) {
+  const date = new Date(value);
+  return Number.isFinite(date.getTime()) ? date : null;
+}
+
+function captureWindowEnd(show) {
+  const cutoffDate = validDate(show.cutoffAt);
+  if (cutoffDate) {
+    cutoffDate.setMinutes(cutoffDate.getMinutes() + 5);
+    return cutoffDate;
+  }
+
+  const captureDate = validDate(show.captureAt);
+  if (!captureDate) return null;
+  captureDate.setMinutes(captureDate.getMinutes() + 20);
+  return captureDate;
+}
+
+function isShowInCaptureWindow(show, now) {
+  const captureDate = validDate(show.captureAt);
+  const windowEnd = captureWindowEnd(show);
+  return Boolean(captureDate && windowEnd && now >= captureDate && now <= windowEnd);
+}
+
+function selectTheatresForCollection(theatres, existing, now) {
+  const plannedShows = Array.isArray(existing?.plannedShows) ? existing.plannedShows : [];
+  if (!plannedShows.length) return theatres;
+
+  const activeVenueCodes = new Set(
+    plannedShows
+      .filter((show) => isShowInCaptureWindow(show, now))
+      .map((show) => show.venueCode)
+      .filter(Boolean)
+  );
+
+  if (!activeVenueCodes.size) return [];
+  return theatres.filter((theatre) => activeVenueCodes.has(theatre.venueCode));
 }
 
 function captureKey(show) {
@@ -228,35 +265,16 @@ async function fetchPublishedBoxoffice(isoDate) {
   }
 }
 
-function buildLiveSnapshotUrl({
-  liveApiBase,
-  targetDate,
-  venueCode = "",
-  isTicketNew = false,
-  mirrorOnly = false,
-  retryRounds
-}) {
+async function fetchLiveTheatreSnapshot(liveApiBase, targetDate, venueCode) {
   const url = new URL(`${liveApiBase}/api/live`);
   url.searchParams.set("date", targetDate.isoDate);
+  url.searchParams.set("venueCode", venueCode);
   url.searchParams.set("strict", "1");
-  url.searchParams.set("mirrorRetryRounds", String(retryRounds || (isTicketNew ? 1 : 6)));
-  if (venueCode) {
-    url.searchParams.set("venueCode", venueCode);
-  }
-  if (mirrorOnly) {
-    url.searchParams.set("mirrorOnly", "1");
-  }
   url.searchParams.set("ts", String(Date.now()));
-  return url;
-}
 
-async function fetchLiveSnapshotUrl({ url, targetDate, isTicketNew }) {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), isTicketNew ? 15000 : 26000);
   const response = await fetch(url, {
-    signal: controller.signal,
     headers: { accept: "application/json" }
-  }).finally(() => clearTimeout(timeout));
+  });
   const text = await response.text();
   if (!response.ok) {
     throw new Error(`${response.status} ${response.statusText}: ${text.slice(0, 180)}`);
@@ -268,106 +286,6 @@ async function fetchLiveSnapshotUrl({ url, targetDate, isTicketNew }) {
   }
 
   return data;
-}
-
-function filterSnapshotForVenue(snapshot, venueCode) {
-  const shows = (snapshot.shows || []).filter((show) => show.venueCode === venueCode);
-  return {
-    ...snapshot,
-    shows,
-    meta: {
-      ...(snapshot.meta || {}),
-      selectedVenueCode: venueCode,
-      boxofficeSource: "bulk-filtered"
-    }
-  };
-}
-
-async function fetchBookMyShowBulkSnapshot(liveApiBase, targetDate) {
-  const attempts = [
-    {
-      label: "bms-bulk-theatre-discovery",
-      url: buildLiveSnapshotUrl({
-        liveApiBase,
-        targetDate,
-        retryRounds: 6
-      })
-    },
-    {
-      label: "bms-bulk-mirror",
-      url: buildLiveSnapshotUrl({
-        liveApiBase,
-        targetDate,
-        mirrorOnly: true,
-        retryRounds: 6
-      })
-    }
-  ];
-
-  const runners = attempts.map(async (attempt) => {
-    try {
-      const snapshot = await fetchLiveSnapshotUrl({
-        url: attempt.url,
-        targetDate,
-        isTicketNew: false
-      });
-      return {
-        ...snapshot,
-        meta: {
-          ...(snapshot.meta || {}),
-          boxofficeSource: attempt.label
-        }
-      };
-    } catch (error) {
-      throw new Error(`${attempt.label}: ${error.message}`);
-    }
-  });
-
-  try {
-    return await Promise.any(runners);
-  } catch (error) {
-    const errors = error.errors || [error];
-    throw new Error(errors.map((entry) => entry.message).join(" | "));
-  }
-}
-
-async function fetchLiveTheatreSnapshot(liveApiBase, targetDate, venueCode) {
-  const normalizedVenueCode = String(venueCode || "").toUpperCase();
-  const isTicketNew = TICKETNEW_THEATRES.has(normalizedVenueCode);
-  const directUrl = buildLiveSnapshotUrl({
-    liveApiBase,
-    targetDate,
-    venueCode: normalizedVenueCode,
-    isTicketNew,
-    retryRounds: isTicketNew ? 1 : 6
-  });
-
-  try {
-    return await fetchLiveSnapshotUrl({ url: directUrl, targetDate, isTicketNew });
-  } catch (error) {
-    if (isTicketNew) throw error;
-
-    const bulkUrl = buildLiveSnapshotUrl({
-      liveApiBase,
-      targetDate,
-      isTicketNew: false,
-      mirrorOnly: true,
-      retryRounds: 6
-    });
-    const bulkData = await fetchLiveSnapshotUrl({ url: bulkUrl, targetDate, isTicketNew: false });
-    const shows = (bulkData.shows || []).filter((show) => show.venueCode === normalizedVenueCode);
-    if (!shows.length) throw error;
-
-    return {
-      ...bulkData,
-      shows,
-      meta: {
-        ...(bulkData.meta || {}),
-        boxofficeFallback: "bulk-mirror-filtered",
-        selectedVenueCode: normalizedVenueCode
-      }
-    };
-  }
 }
 
 async function publishRemoteBoxoffice(liveApiBase, data) {
@@ -496,68 +414,46 @@ async function main() {
   const outputPath = path.join(BOXOFFICE_DIR, `${targetDate.isoDate}.json`);
   const existing = (await readJson(outputPath, null)) || (await fetchPublishedBoxoffice(targetDate.isoDate));
   const capturesByKey = new Map((existing?.captures || []).map((show) => [show.key || captureKey(show), show]));
-  const plannedByKey = new Map();
+  const plannedByKey = new Map((existing?.plannedShows || []).map((show) => [show.key || captureKey(show), show]));
   const errors = [];
   const now = new Date();
   const generatedAt = now.toISOString();
   const theatres = config.theatres.filter(
     (theatre) => theatre.active !== false && ACTIVE_THEATRES.has(theatre.venueCode)
   );
-  const bmsTheatres = theatres.filter((theatre) => BOOKMYSHOW_THEATRES.has(theatre.venueCode));
-  const ticketNewTheatres = theatres.filter((theatre) => TICKETNEW_THEATRES.has(theatre.venueCode));
+  const theatresToCollect = selectTheatresForCollection(theatres, existing, now);
 
-  const applySnapshot = (theatre, snapshot) => {
-    const policy = CAPTURE_POLICY[theatre.venueCode] || {
-      fallbackCaptureAfterMinutes: theatre.fallbackCutoffMinutes || 15,
-      captureBeforeCutoffMinutes: 1,
-      note: "Fallback theatre capture policy."
-    };
+  for (const theatre of theatresToCollect) {
+    try {
+      const snapshot = await fetchLiveTheatreSnapshot(liveApiBase, targetDate, theatre.venueCode);
+      const policy = CAPTURE_POLICY[theatre.venueCode] || {
+        fallbackCaptureAfterMinutes: theatre.fallbackCutoffMinutes || 15,
+        captureBeforeCutoffMinutes: 1,
+        note: "Fallback theatre capture policy."
+      };
 
-    for (const show of snapshot.shows || []) {
-      if (show.showDate !== targetDate.isoDate) continue;
-      if (show.venueCode !== theatre.venueCode) continue;
-      if (!show.showDateTime) continue;
+      for (const show of snapshot.shows || []) {
+        if (show.showDate !== targetDate.isoDate) continue;
+        if (show.venueCode !== theatre.venueCode) continue;
+        if (!show.showDateTime) continue;
 
-      const captureAt = resolveCaptureAt(show, policy);
-      const key = captureKey(show);
-      plannedByKey.set(key, {
-        ...show,
-        key,
-        captureAt,
-        capturePolicy: policy
-      });
+        const captureAt = resolveCaptureAt(show, policy);
+        const key = captureKey(show);
+        plannedByKey.set(key, {
+          ...show,
+          key,
+          captureAt,
+          capturePolicy: policy
+        });
 
-      if (now >= new Date(captureAt) && number(show.totalSeats) > 0) {
-        capturesByKey.set(key, normalizeShowForCapture(show, generatedAt, captureAt, policy));
+        if (now >= new Date(captureAt) && number(show.totalSeats) > 0) {
+          capturesByKey.set(key, normalizeShowForCapture(show, generatedAt, captureAt, policy));
+        }
       }
+    } catch (error) {
+      errors.push(`${theatre.shortName}: ${error.message}`);
     }
-  };
-
-  try {
-    const bmsBulkSnapshot = await fetchBookMyShowBulkSnapshot(liveApiBase, targetDate);
-
-    for (const theatre of bmsTheatres) {
-      const theatreSnapshot = filterSnapshotForVenue(bmsBulkSnapshot, theatre.venueCode);
-      if (theatreSnapshot.shows.length) {
-        applySnapshot(theatre, theatreSnapshot);
-      } else {
-        errors.push(`${theatre.shortName}: No BMS shows returned in bulk snapshot.`);
-      }
-    }
-  } catch (error) {
-    errors.push(`BookMyShow bulk: ${error.message}`);
   }
-
-  await Promise.all(
-    ticketNewTheatres.map(async (theatre) => {
-      try {
-        const snapshot = await fetchLiveTheatreSnapshot(liveApiBase, targetDate, theatre.venueCode);
-        applySnapshot(theatre, snapshot);
-      } catch (error) {
-        errors.push(`${theatre.shortName}: ${error.message}`);
-      }
-    })
-  );
 
   await fs.mkdir(BOXOFFICE_DIR, { recursive: true });
   const data = buildOutput({
