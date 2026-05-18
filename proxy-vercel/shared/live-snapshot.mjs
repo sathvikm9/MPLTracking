@@ -928,6 +928,22 @@ async function buildCatalogLiveSnapshotWithVenueFallback({
   } catch (error) {
     if (!venueCode || isSaiChitraVenue(venueCode)) throw error;
 
+    const seededVenueEvents = seededEventCodesForVenueDate(venueCode, date);
+    if (seededVenueEvents.length) {
+      try {
+        return await buildCatalogLiveSnapshot({
+          date,
+          venueCode,
+          fetchImpl,
+          snapshotBaseUrl,
+          allowLastGoodCache,
+          retryRounds: Math.min(Number(retryRounds || 1) + 1, 6)
+        });
+      } catch {
+        throw error;
+      }
+    }
+
     const bulkOutput = await buildCatalogLiveSnapshot({
       date,
       venueCode: "",

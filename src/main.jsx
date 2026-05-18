@@ -1022,7 +1022,7 @@ function useDashboardData(selectedDate, selectedTheatre) {
     const attempts = [
       {
         mode: "live-proxy-mirror-retry",
-        url: buildLiveUrl({ mirrorOnly: 1, mirrorRetryRounds: 3 })
+        url: buildLiveUrl({ mirrorOnly: 1, mirrorRetryRounds: 3, forceVenue: 1 })
       },
       {
         mode: "live-proxy-theatre-backup",
