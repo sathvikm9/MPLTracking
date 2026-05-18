@@ -4,6 +4,7 @@ import { readBoxofficeSnapshot, writeBoxofficeSnapshot } from "./upstash-boxoffi
 
 const INDIA_TIMEZONE = "Asia/Kolkata";
 const ACTIVE_THEATRES = new Set(["RTDM", "MSDR", "ASRM", "SKMD", "SAIC"]);
+const TICKETNEW_THEATRES = new Set(["SAIC"]);
 const CITY = {
   name: "Madanapalle",
   regionCode: "MDNP",
@@ -26,13 +27,13 @@ const CAPTURE_POLICY = {
   },
   ASRM: {
     fallbackCaptureAfterMinutes: 12,
-    captureBeforeCutoffMinutes: 3,
-    note: "ASR captures about 3 minutes before the 15-minute cutoff."
+    captureBeforeCutoffMinutes: 5,
+    note: "ASR starts capture about 5 minutes before the 15-minute cutoff, then keeps the latest successful run."
   },
   SKMD: {
     fallbackCaptureAfterMinutes: 12,
-    captureBeforeCutoffMinutes: 3,
-    note: "Sri Krishna captures about 3 minutes before the 15-minute cutoff."
+    captureBeforeCutoffMinutes: 5,
+    note: "Sri Krishna starts capture about 5 minutes before the 15-minute cutoff, then keeps the latest successful run."
   },
   SAIC: {
     fallbackCaptureAfterMinutes: -3,
@@ -96,40 +97,6 @@ function resolveCaptureAt(show, policy) {
 function validDate(value) {
   const date = new Date(value);
   return Number.isFinite(date.getTime()) ? date : null;
-}
-
-function captureWindowEnd(show) {
-  const cutoffAt = validDate(show.cutoffAt);
-  if (cutoffAt) {
-    cutoffAt.setMinutes(cutoffAt.getMinutes() + 5);
-    return cutoffAt;
-  }
-
-  const captureAt = validDate(show.captureAt);
-  if (!captureAt) return null;
-  captureAt.setMinutes(captureAt.getMinutes() + 20);
-  return captureAt;
-}
-
-function isShowInCaptureWindow(show, now) {
-  const captureAt = validDate(show.captureAt);
-  const windowEnd = captureWindowEnd(show);
-  return Boolean(captureAt && windowEnd && now >= captureAt && now <= windowEnd);
-}
-
-function selectTheatresForCollection(theatres, existing, now) {
-  const plannedShows = Array.isArray(existing?.plannedShows) ? existing.plannedShows : [];
-  if (!plannedShows.length) return theatres;
-
-  const activeVenueCodes = new Set(
-    plannedShows
-      .filter((show) => isShowInCaptureWindow(show, now))
-      .map((show) => show.venueCode)
-      .filter(Boolean)
-  );
-
-  if (!activeVenueCodes.size) return [];
-  return theatres.filter((theatre) => activeVenueCodes.has(theatre.venueCode));
 }
 
 function captureKey(show) {
@@ -259,30 +226,59 @@ function normalizeShowForCapture(show, capturedAt, captureAt, policy) {
   };
 }
 
-async function fetchLiveTheatreSnapshot({ liveApiBase, date, venueCode, fetchImpl = fetch }) {
+function buildLiveSnapshotUrl({ liveApiBase, date, venueCode, isTicketNew }) {
   const url = new URL(`${liveApiBase}/api/live`);
   url.searchParams.set("date", date);
-  url.searchParams.set("venueCode", venueCode);
   url.searchParams.set("liveOnly", "1");
-  url.searchParams.set("mirrorRetryRounds", "6");
+  url.searchParams.set("allowCache", "0");
+  url.searchParams.set("venueCode", venueCode);
+  url.searchParams.set("mirrorRetryRounds", isTicketNew ? "1" : "6");
+  if (!isTicketNew) {
+    url.searchParams.set("mirrorOnly", "1");
+  }
   url.searchParams.set("ts", String(Date.now()));
+  return url;
+}
+
+async function fetchLiveSnapshotUrl({ url, expectedDate, isTicketNew, fetchImpl }) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), isTicketNew ? 15000 : 18000);
 
   const response = await fetchImpl(url, {
+    signal: controller.signal,
     headers: {
       accept: "application/json"
     }
-  });
+  }).finally(() => clearTimeout(timeout));
   const text = await response.text();
   if (!response.ok) {
     throw new Error(`${response.status} ${response.statusText}: ${text.slice(0, 180)}`);
   }
 
   const data = JSON.parse(text);
-  if (data.targetDate !== date) {
+  if (data.targetDate !== expectedDate) {
     throw new Error(`Wrong target date returned: ${data.targetDate || "unknown"}`);
   }
 
   return data;
+}
+
+async function fetchLiveTheatreSnapshot({ liveApiBase, date, venueCode, fetchImpl = fetch }) {
+  const normalizedVenueCode = String(venueCode || "").toUpperCase();
+  const isTicketNew = TICKETNEW_THEATRES.has(normalizedVenueCode);
+  const directUrl = buildLiveSnapshotUrl({
+    liveApiBase,
+    date,
+    venueCode: normalizedVenueCode,
+    isTicketNew
+  });
+
+  return fetchLiveSnapshotUrl({
+    url: directUrl,
+    expectedDate: date,
+    isTicketNew,
+    fetchImpl
+  });
 }
 
 function buildOutput({ date, existing, captures, plannedShows, errors, generatedAt }) {
@@ -325,10 +321,9 @@ export async function collectBoxofficeSnapshot({
   const theatres = [...MADANAPALLE_THEATRES, SAI_CHITRA_THEATRE].filter((theatre) =>
     ACTIVE_THEATRES.has(theatre.venueCode)
   );
-  const theatresToCollect = selectTheatresForCollection(theatres, existing, now);
 
   await Promise.all(
-    theatresToCollect.map(async (theatre) => {
+    theatres.map(async (theatre) => {
       try {
         const snapshot = await fetchLiveTheatreSnapshot({
           liveApiBase,
