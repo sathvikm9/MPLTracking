@@ -5,6 +5,7 @@ import "./styles.css";
 
 const INDIA_TIMEZONE = "Asia/Kolkata";
 const SERVER_ERROR_MESSAGE = "Server is not responding, please try again later.";
+const THEATRE_SELECTION_MESSAGE = "Select a theatre or All Theatres to load live data.";
 const LAST_GOOD_DASHBOARD_CACHE_PREFIX = "mpltracking:last-good-live";
 const LAST_GOOD_DASHBOARD_CACHE_MAX_AGE_MS = 1000 * 60 * 60 * 6;
 const CITY_INFO = {
@@ -464,14 +465,14 @@ function getInitialSelectedDate() {
 }
 
 function getInitialSelectedTheatre() {
-  if (typeof window === "undefined") return "ALL";
+  if (typeof window === "undefined") return "";
 
   const urlTheatre = new URLSearchParams(window.location.search).get("theatre");
   if (THEATRE_OPTIONS.some((option) => option.value === urlTheatre)) {
     return urlTheatre;
   }
 
-  return "ALL";
+  return "";
 }
 
 function syncSelectionToUrl(selectedDate, selectedTheatre, movieTracking) {
@@ -480,7 +481,7 @@ function syncSelectionToUrl(selectedDate, selectedTheatre, movieTracking) {
   const url = new URL(window.location.href);
   url.searchParams.set("date", selectedDate);
 
-  if (selectedTheatre === "ALL") {
+  if (!selectedTheatre) {
     url.searchParams.delete("theatre");
   } else {
     url.searchParams.set("theatre", selectedTheatre);
@@ -847,6 +848,19 @@ function useDateAvailability(selectedTheatre) {
   React.useEffect(() => {
     let active = true;
 
+    if (!selectedTheatre) {
+      setState({
+        loading: false,
+        error: null,
+        notes: [],
+        dateOptions: [],
+        allDates: []
+      });
+      return () => {
+        active = false;
+      };
+    }
+
     loadRuntimeConfig()
       .then(async (config) => {
         const liveApiBase = normalizeLiveApiBase(config);
@@ -906,13 +920,20 @@ function useDateAvailability(selectedTheatre) {
 
 function useDashboardData(selectedDate, selectedTheatre) {
   const [state, setState] = React.useState({
-    loading: true,
+    loading: false,
     error: null,
     data: null,
     refreshing: false
   });
 
   const loadDashboard = React.useCallback(async () => {
+    if (!selectedTheatre) {
+      return {
+        ok: true,
+        data: buildEmptyDataset(selectedDate)
+      };
+    }
+
     const config = await loadRuntimeConfig();
     const liveApiBase = normalizeLiveApiBase(config);
     if (!liveApiBase) {
@@ -1065,8 +1086,8 @@ function useDashboardData(selectedDate, selectedTheatre) {
 
       setState((current) => ({
         ...current,
-        loading: isInitial ? true : current.loading,
-        refreshing: !isInitial,
+        loading: isInitial && Boolean(selectedTheatre),
+        refreshing: !isInitial && Boolean(selectedTheatre),
         error: null
       }));
 
@@ -1584,31 +1605,37 @@ function LiveTrackingScreen({ screenSwitcher }) {
   }, [selectedDate, selectedTheatre]);
 
   const selectedTheatreLabel =
-    THEATRE_OPTIONS.find((option) => option.value === selectedTheatre)?.label || "All Theatres";
+    THEATRE_OPTIONS.find((option) => option.value === selectedTheatre)?.label || "Select theatre";
   const safeData = error || !data ? buildEmptyDataset(selectedDate) : data;
   const allShows = [...(safeData.shows || [])].sort(compareShows);
   const filteredShows =
-    selectedTheatre === "ALL"
-      ? allShows
-      : allShows.filter((show) => show.venueCode === selectedTheatre);
+    !selectedTheatre
+      ? []
+      : selectedTheatre === "ALL"
+        ? allShows
+        : allShows.filter((show) => show.venueCode === selectedTheatre);
   const summary = buildSummaryFromShows(filteredShows);
   const movies = summarizeMoviesFromShows(filteredShows);
   const theatres = summarizeTheatresFromShows(filteredShows);
   const generatedLabel = data ? formatGeneratedAt(data) : "Not loaded yet";
   const ageLabel = data ? snapshotAgeLabel(data.generatedAt) : "Waiting for live API";
   const isBusy = loading || refreshing;
-  const statusMessage = loading
-    ? `Fetching live data for ${selectedTheatreLabel} on ${formatSelectedDateLabel(selectedDate)}...`
-    : refreshing
+  const statusMessage = !selectedTheatre
+    ? THEATRE_SELECTION_MESSAGE
+    : loading
+      ? `Fetching live data for ${selectedTheatreLabel} on ${formatSelectedDateLabel(selectedDate)}...`
+      : refreshing
       ? "Refreshing live data..."
       : error
         ? SERVER_ERROR_MESSAGE
         : !filteredShows.length
           ? "No Shows Available for selected date"
           : `${number(filteredShows.length)} live show lines loaded.`;
-  const emptyMessage = error
-    ? SERVER_ERROR_MESSAGE
-    : isBusy
+  const emptyMessage = !selectedTheatre
+    ? THEATRE_SELECTION_MESSAGE
+    : error
+      ? SERVER_ERROR_MESSAGE
+      : isBusy
       ? "Fetching live data..."
       : "No Shows Available for selected date";
 
@@ -1628,6 +1655,7 @@ function LiveTrackingScreen({ screenSwitcher }) {
                 value={selectedTheatre}
                 onChange={(event) => setSelectedTheatre(event.target.value)}
               >
+                <option value="">Select theatre</option>
                 {THEATRE_OPTIONS.map((option) => (
                   <option key={option.value} value={option.value}>
                     {option.label}
@@ -1657,7 +1685,7 @@ function LiveTrackingScreen({ screenSwitcher }) {
           </div>
 
           <div className="hero__actions">
-            <button className="refresh-button" onClick={refresh} disabled={isBusy}>
+            <button className="refresh-button" onClick={refresh} disabled={isBusy || !selectedTheatre}>
               {isBusy ? <span className="button-spinner" aria-hidden="true" /> : null}
               {refreshing ? "Refreshing live data..." : "Refresh live data"}
             </button>
@@ -1672,7 +1700,13 @@ function LiveTrackingScreen({ screenSwitcher }) {
           <div className="meta-pill">
             <span>Theatre Filter</span>
             <strong>{selectedTheatreLabel}</strong>
-            <small>{selectedTheatre === "ALL" ? "All active Madanapalle theatres" : "Single theatre"}</small>
+            <small>
+              {!selectedTheatre
+                ? "Choose a theatre to start"
+                : selectedTheatre === "ALL"
+                  ? "All active Madanapalle theatres"
+                  : "Single theatre"}
+            </small>
           </div>
           <div className="meta-pill">
             <span>Last Checked</span>
