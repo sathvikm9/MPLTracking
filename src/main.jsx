@@ -999,6 +999,10 @@ function useDashboardData(selectedDate, selectedTheatre) {
         throw failures[0]?.result.reason || new Error(SERVER_ERROR_MESSAGE);
       }
 
+      if (failures.length) {
+        throw failures[0]?.result.reason || new Error(SERVER_ERROR_MESSAGE);
+      }
+
       const notes = failures.map(
         (entry) => `${THEATRE_BY_CODE.get(entry.theatreCode) || entry.theatreCode} failed live refresh.`
       );
