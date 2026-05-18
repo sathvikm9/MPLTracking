@@ -24,6 +24,9 @@ const THEATRE_OPTIONS = [
   { value: "ALL", label: "All Theatres" }
 ];
 const THEATRE_BY_CODE = new Map(THEATRE_OPTIONS.map((option) => [option.value, option.label]));
+const TRACKED_THEATRE_CODES = THEATRE_OPTIONS
+  .filter((option) => option.value !== "ALL")
+  .map((option) => option.value);
 
 function currency(value) {
   return new Intl.NumberFormat("en-IN", {
@@ -172,6 +175,57 @@ function annotateClientSource(data, source) {
     meta: {
       ...(data.meta || {}),
       clientSource: source
+    }
+  };
+}
+
+function mergeLiveTheatreResponses(responses, selectedDate, notes = []) {
+  const shows = responses.flatMap((response) => response.shows || []).sort(compareShows);
+  const generatedAt = responses
+    .map((response) => response.generatedAt)
+    .filter(Boolean)
+    .sort()
+    .at(-1) || new Date().toISOString();
+  const liveRefreshEntries = responses.map((response) => response.meta?.liveRefresh || {});
+
+  return {
+    version: 1,
+    generatedAt,
+    targetDate: selectedDate,
+    targetDateCode: selectedDate.replaceAll("-", ""),
+    timezone: CITY_INFO.timezone,
+    city: CITY_INFO,
+    summary: buildSummaryFromShows(shows),
+    movies: summarizeMoviesFromShows(shows),
+    theatres: summarizeTheatresFromShows(shows),
+    shows,
+    meta: {
+      status: "ok",
+      source: "client-theatre-aggregate",
+      liveProxy: true,
+      notes,
+      liveRefresh: {
+        attemptedEvents: liveRefreshEntries.reduce(
+          (sum, entry) => sum + Number(entry.attemptedEvents || 0),
+          0
+        ),
+        successfulEvents: liveRefreshEntries.reduce(
+          (sum, entry) => sum + Number(entry.successfulEvents || 0),
+          0
+        ),
+        failedEvents: liveRefreshEntries.reduce(
+          (sum, entry) => sum + Number(entry.failedEvents || 0),
+          0
+        ),
+        failedEventCodes: liveRefreshEntries.flatMap((entry) => entry.failedEventCodes || []),
+        cachedEvents: liveRefreshEntries.reduce(
+          (sum, entry) => sum + Number(entry.cachedEvents || 0),
+          0
+        ),
+        cachedEventCodes: liveRefreshEntries.flatMap((entry) => entry.cachedEventCodes || []),
+        liveShowCount: shows.length,
+        fallbackShowCount: 0
+      }
     }
   };
 }
@@ -865,28 +919,101 @@ function useDashboardData(selectedDate, selectedTheatre) {
       throw new Error(SERVER_ERROR_MESSAGE);
     }
 
-    const buildLiveUrl = (params = {}) => {
+    const buildLiveUrl = (params = {}, theatreCode = selectedTheatre) => {
       const liveUrl = new URL(`${liveApiBase}/api/live`);
       const useBulkBmsMirror =
         params.mirrorOnly &&
-        selectedTheatre !== "ALL" &&
-        selectedTheatre !== "SAIC";
+        !params.forceVenue &&
+        theatreCode !== "ALL" &&
+        theatreCode !== "SAIC";
 
       liveUrl.searchParams.set("date", selectedDate);
       liveUrl.searchParams.set("liveOnly", "1");
       liveUrl.searchParams.set("allowCache", "0");
       liveUrl.searchParams.set("ts", String(Date.now()));
 
-      if (selectedTheatre !== "ALL" && !useBulkBmsMirror) {
-        liveUrl.searchParams.set("venueCode", selectedTheatre);
+      if (theatreCode !== "ALL" && !useBulkBmsMirror) {
+        liveUrl.searchParams.set("venueCode", theatreCode);
       }
 
       for (const [key, value] of Object.entries(params)) {
+        if (key === "forceVenue") continue;
         liveUrl.searchParams.set(key, String(value));
       }
 
       return liveUrl;
     };
+
+    const fetchSingleTheatre = async (theatreCode) => {
+      const theatreAttempts =
+        theatreCode === "SAIC"
+          ? [{ mode: "ticketnew-seat-layout", url: buildLiveUrl({ mirrorRetryRounds: 1 }, theatreCode) }]
+          : [
+              {
+                mode: "live-proxy-mirror-retry",
+                url: buildLiveUrl(
+                  { mirrorOnly: 1, mirrorRetryRounds: 3, forceVenue: 1 },
+                  theatreCode
+                )
+              },
+              {
+                mode: "live-proxy-theatre-backup",
+                url: buildLiveUrl({ mirrorRetryRounds: 2 }, theatreCode)
+              }
+            ];
+      let lastError = null;
+
+      for (const attempt of theatreAttempts) {
+        try {
+          const liveData = await fetchJson(attempt.url.toString());
+          if (liveData.targetDate !== selectedDate || isLiveCountFailure(liveData)) {
+            throw new Error(SERVER_ERROR_MESSAGE);
+          }
+
+          return annotateClientSource(liveData, {
+            mode: attempt.mode,
+            liveApiBase,
+            selectedDate,
+            selectedTheatre: theatreCode
+          });
+        } catch (error) {
+          lastError = error;
+        }
+      }
+
+      throw lastError || new Error(SERVER_ERROR_MESSAGE);
+    };
+
+    if (selectedTheatre === "ALL") {
+      const settled = await Promise.allSettled(
+        TRACKED_THEATRE_CODES.map((theatreCode) => fetchSingleTheatre(theatreCode))
+      );
+      const successes = settled
+        .filter((result) => result.status === "fulfilled")
+        .map((result) => result.value);
+      const failures = settled
+        .map((result, index) => ({ result, theatreCode: TRACKED_THEATRE_CODES[index] }))
+        .filter((entry) => entry.result.status === "rejected");
+
+      if (!successes.length) {
+        throw failures[0]?.result.reason || new Error(SERVER_ERROR_MESSAGE);
+      }
+
+      const notes = failures.map(
+        (entry) => `${THEATRE_BY_CODE.get(entry.theatreCode) || entry.theatreCode} failed live refresh.`
+      );
+      const merged = mergeLiveTheatreResponses(successes, selectedDate, notes);
+
+      return {
+        ok: true,
+        data: annotateClientSource(merged, {
+          mode: "client-theatre-aggregate",
+          liveApiBase,
+          selectedDate,
+          selectedTheatre
+        })
+      };
+    }
 
     const attempts = [
       {

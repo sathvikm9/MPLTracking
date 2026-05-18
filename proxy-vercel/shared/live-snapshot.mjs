@@ -87,7 +87,8 @@ const MADANAPALLE_VISIBLE_DATE_SEEDS = [
   ["SKMD", "2026-05-14", 1, "Godari Gattupaina"],
   ["SKMD", "2026-05-15", 4, "Mr. Work From Home, Godari Gattupaina"],
   ["SKMD", "2026-05-16", 4, "Mr. Work From Home, Godari Gattupaina"],
-  ["SKMD", "2026-05-17", 4, "Mr. Work From Home, Godari Gattupaina"]
+  ["SKMD", "2026-05-17", 4, "Mr. Work From Home, Godari Gattupaina"],
+  ["SKMD", "2026-05-18", 4, "Godari Gattupaina"]
 ];
 
 const MADANAPALLE_VISIBLE_EVENT_SEEDS = [
@@ -117,7 +118,8 @@ const MADANAPALLE_VISIBLE_EVENT_SEEDS = [
   ["SKMD", "2026-05-14", ["ET00495010"]],
   ["SKMD", "2026-05-15", ["ET00488038", "ET00495010"]],
   ["SKMD", "2026-05-16", ["ET00488038", "ET00495010"]],
-  ["SKMD", "2026-05-17", ["ET00488038", "ET00495010"]]
+  ["SKMD", "2026-05-17", ["ET00488038", "ET00495010"]],
+  ["SKMD", "2026-05-18", ["ET00495010"]]
 ];
 
 function toNumber(value) {
