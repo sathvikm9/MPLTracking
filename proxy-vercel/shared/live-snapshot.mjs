@@ -1254,6 +1254,14 @@ async function buildCatalogLiveSnapshot({
   ) {
     throw new Error("Live mirror fallback failed for all selected events.");
   }
+  if (
+    !allowLastGoodCache &&
+    venueCode &&
+    Number(liveRefresh.failedEvents || 0) > 0 &&
+    !(output.shows || []).length
+  ) {
+    throw new Error("Live mirror fallback returned no selected-theatre shows after one or more event failures.");
+  }
 
   return {
     ...output,
