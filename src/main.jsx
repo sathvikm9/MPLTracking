@@ -1729,6 +1729,11 @@ function LiveTrackingScreen({ screenSwitcher }) {
               )
             },
             {
+              key: "totalShows",
+              label: "Shows",
+              render: (movie) => number(movie.totalShows)
+            },
+            {
               key: "totalSold",
               label: "Sold",
               render: (movie) => number(movie.totalSold)
