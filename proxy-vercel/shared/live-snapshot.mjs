@@ -1501,6 +1501,9 @@ async function buildCatalogLiveSnapshot({
     };
   }
   const liveRefresh = output.meta?.liveRefresh || {};
+  const expectedEventCodes = [...new Set([...seededEventCodes, ...exactEventCodes])].filter(Boolean);
+  const outputEventCodes = new Set((output.shows || []).map((show) => String(show.eventCode || "").toUpperCase()));
+  const missingExpectedEventCodes = expectedEventCodes.filter((eventCode) => !outputEventCodes.has(eventCode));
   if (
     !allowLastGoodCache &&
     Number(liveRefresh.attemptedEvents || 0) > 0 &&
@@ -1508,6 +1511,16 @@ async function buildCatalogLiveSnapshot({
     !(output.shows || []).length
   ) {
     throw new Error("Live mirror fallback failed for all selected events.");
+  }
+  if (
+    !allowLastGoodCache &&
+    venueCode &&
+    expectedEventCodes.length > 1 &&
+    missingExpectedEventCodes.length > 0
+  ) {
+    throw new Error(
+      `Live mirror fallback returned partial selected-theatre shows; missing event codes: ${missingExpectedEventCodes.join(", ")}.`
+    );
   }
   if (
     !allowLastGoodCache &&
@@ -1530,6 +1543,8 @@ async function buildCatalogLiveSnapshot({
         seedCount: seededEventCodes.length,
         storedHintCount: storedHints.eventCodes.length,
         catalogCount: catalogEventCodes.length,
+        expectedEventCodes,
+        missingExpectedEventCodes,
         source: catalog.source || "",
         cache: catalog.cache
       },
