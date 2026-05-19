@@ -261,6 +261,7 @@ function buildLiveSnapshotUrl({ liveApiBase, date, venueCode, isTicketNew }) {
   url.searchParams.set("mirrorRetryRounds", isTicketNew ? "1" : "6");
   if (!isTicketNew) {
     url.searchParams.set("mirrorOnly", "1");
+    url.searchParams.set("requireComplete", "1");
   }
   url.searchParams.set("ts", String(Date.now()));
   return url;

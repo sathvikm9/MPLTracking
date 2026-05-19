@@ -1068,7 +1068,8 @@ async function buildCatalogLiveSnapshotWithVenueFallback({
   fetchImpl,
   snapshotBaseUrl,
   allowLastGoodCache,
-  retryRounds
+  retryRounds,
+  requireComplete = false
 }) {
   try {
     return await buildCatalogLiveSnapshot({
@@ -1077,7 +1078,8 @@ async function buildCatalogLiveSnapshotWithVenueFallback({
       fetchImpl,
       snapshotBaseUrl,
       allowLastGoodCache,
-      retryRounds
+      retryRounds,
+      requireComplete
     });
   } catch (error) {
     if (!venueCode || isSaiChitraVenue(venueCode)) throw error;
@@ -1091,7 +1093,8 @@ async function buildCatalogLiveSnapshotWithVenueFallback({
           fetchImpl,
           snapshotBaseUrl,
           allowLastGoodCache,
-          retryRounds: Math.min(Number(retryRounds || 1) + 1, 6)
+          retryRounds: Math.min(Number(retryRounds || 1) + 1, 6),
+          requireComplete
         });
       } catch {
         throw error;
@@ -1104,7 +1107,8 @@ async function buildCatalogLiveSnapshotWithVenueFallback({
       fetchImpl,
       snapshotBaseUrl,
       allowLastGoodCache,
-      retryRounds
+      retryRounds,
+      requireComplete
     });
     const filteredOutput = filterOutputByVenueCode(bulkOutput, venueCode);
     if (!filteredOutput.shows?.length) throw error;
@@ -1395,13 +1399,15 @@ async function buildCatalogLiveSnapshot({
   fetchImpl,
   snapshotBaseUrl,
   allowLastGoodCache = true,
-  retryRounds = 2
+  retryRounds = 2,
+  requireComplete = false
 }) {
   const notes = [];
   const storedHints = await storedEventHintsForVenueDate(venueCode, date, notes);
   const seededEventCodes = seededEventCodesForVenueDate(venueCode, date);
   const exactEventCodes = [...new Set(storedHints.eventCodes)].filter(Boolean);
   const exactExpectedShowCount = storedHints.totalShows;
+  const seededExpectedShowCount = seededShowCountForVenueDate(venueCode, date);
   const { eventCodes: catalogEventCodes, catalog } = await eventCodesFromMadanapalleCatalog(
     fetchImpl,
     notes
@@ -1504,6 +1510,7 @@ async function buildCatalogLiveSnapshot({
   const expectedEventCodes = [...new Set([...seededEventCodes, ...exactEventCodes])].filter(Boolean);
   const outputEventCodes = new Set((output.shows || []).map((show) => String(show.eventCode || "").toUpperCase()));
   const missingExpectedEventCodes = expectedEventCodes.filter((eventCode) => !outputEventCodes.has(eventCode));
+  const expectedShowCount = Math.max(Number(exactExpectedShowCount || 0), Number(seededExpectedShowCount || 0));
   if (
     !allowLastGoodCache &&
     Number(liveRefresh.attemptedEvents || 0) > 0 &&
@@ -1513,13 +1520,23 @@ async function buildCatalogLiveSnapshot({
     throw new Error("Live mirror fallback failed for all selected events.");
   }
   if (
-    !allowLastGoodCache &&
+    (!allowLastGoodCache || requireComplete) &&
     venueCode &&
     expectedEventCodes.length > 1 &&
     missingExpectedEventCodes.length > 0
   ) {
     throw new Error(
       `Live mirror fallback returned partial selected-theatre shows; missing event codes: ${missingExpectedEventCodes.join(", ")}.`
+    );
+  }
+  if (
+    requireComplete &&
+    venueCode &&
+    expectedShowCount > 0 &&
+    (output.shows || []).length < expectedShowCount
+  ) {
+    throw new Error(
+      `Live mirror fallback returned partial selected-theatre shows; expected ${expectedShowCount}, got ${(output.shows || []).length}.`
     );
   }
   if (
@@ -1543,6 +1560,8 @@ async function buildCatalogLiveSnapshot({
         seedCount: seededEventCodes.length,
         storedHintCount: storedHints.eventCodes.length,
         catalogCount: catalogEventCodes.length,
+        expectedShowCount,
+        requireComplete,
         expectedEventCodes,
         missingExpectedEventCodes,
         source: catalog.source || "",
@@ -1634,6 +1653,7 @@ export async function buildLiveSnapshot({
   const liveOnly = url.searchParams.get("liveOnly") === "1";
   const strictLiveOnly = url.searchParams.get("strict") === "1" || liveOnly;
   const mirrorOnly = url.searchParams.get("mirrorOnly") === "1";
+  const requireComplete = url.searchParams.get("requireComplete") === "1";
   const allowLastGoodCache = !strictLiveOnly && url.searchParams.get("allowCache") !== "0";
   const mirrorRetryRounds = Math.min(
     Math.max(Number(url.searchParams.get("mirrorRetryRounds") || (strictLiveOnly ? 4 : 2)), 1),
@@ -1656,7 +1676,8 @@ export async function buildLiveSnapshot({
         fetchImpl,
         snapshotBaseUrl,
         allowLastGoodCache,
-        retryRounds: mirrorRetryRounds
+        retryRounds: mirrorRetryRounds,
+        requireComplete
       });
       return venueCode ? output : mergeSaiChitraLiveSnapshot(output, { date, fetchImpl });
     } catch (error) {
@@ -1682,7 +1703,8 @@ export async function buildLiveSnapshot({
         fetchImpl,
         snapshotBaseUrl,
         allowLastGoodCache,
-        retryRounds: mirrorRetryRounds
+        retryRounds: mirrorRetryRounds,
+        requireComplete
       });
 
       const fallbackOutput = {
@@ -2010,6 +2032,17 @@ function seededEventCodesForVenueDate(venueCode, date) {
         .flatMap((entry) => entry[2])
     )
   ];
+}
+
+function seededShowCountForVenueDate(venueCode, date) {
+  if (!date) return 0;
+
+  return MADANAPALLE_VISIBLE_DATE_SEEDS
+    .filter(([seedVenueCode, seedDate]) => {
+      if (seedDate !== date) return false;
+      return !venueCode || seedVenueCode === venueCode;
+    })
+    .reduce((sum, entry) => sum + toNumber(entry[2]), 0);
 }
 
 async function storedEventHintsForVenueDate(venueCode, date, notes = []) {
