@@ -108,10 +108,36 @@ function captureKey(show) {
   ].join("::");
 }
 
+function removePlannedShowsForTheatreDate(plannedByKey, venueCode, date) {
+  for (const [key, show] of plannedByKey.entries()) {
+    if (show?.venueCode === venueCode && show?.showDate === date) {
+      plannedByKey.delete(key);
+    }
+  }
+}
+
 function compareShows(left, right) {
   const timeCompare = String(left.showDateTime || "").localeCompare(String(right.showDateTime || ""));
   if (timeCompare) return timeCompare;
   return String(left.theatreShortName || "").localeCompare(String(right.theatreShortName || ""));
+}
+
+async function mapWithConcurrency(items, limit, mapper) {
+  const results = new Array(items.length);
+  let cursor = 0;
+  const workerCount = Math.min(Math.max(Number(limit) || 1, 1), items.length || 1);
+
+  await Promise.all(
+    Array.from({ length: workerCount }, async () => {
+      while (cursor < items.length) {
+        const index = cursor;
+        cursor += 1;
+        results[index] = await mapper(items[index], index);
+      }
+    })
+  );
+
+  return results;
 }
 
 function summarize(shows) {
@@ -322,8 +348,10 @@ export async function collectBoxofficeSnapshot({
     ACTIVE_THEATRES.has(theatre.venueCode)
   );
 
-  await Promise.all(
-    theatres.map(async (theatre) => {
+  await mapWithConcurrency(
+    theatres,
+    2,
+    async (theatre) => {
       try {
         const snapshot = await fetchLiveTheatreSnapshot({
           liveApiBase,
@@ -336,6 +364,8 @@ export async function collectBoxofficeSnapshot({
           captureBeforeCutoffMinutes: 1,
           note: "Fallback theatre capture policy."
         };
+
+        removePlannedShowsForTheatreDate(plannedByKey, theatre.venueCode, date);
 
         for (const show of snapshot.shows || []) {
           if (show.showDate !== date) continue;
@@ -358,7 +388,7 @@ export async function collectBoxofficeSnapshot({
       } catch (error) {
         errors.push(`${theatre.shortName}: ${error.message}`);
       }
-    })
+    }
   );
 
   const data = buildOutput({

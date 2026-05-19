@@ -1,11 +1,12 @@
 const MADANAPALLE_REGION_CODE = "MDNP";
 const SHOWTIME_API_BASE_URLS = [
+  "https://bms-india4.vercel.app/api/showtimes",
   "https://bms-india2.vercel.app/api/showtimes",
-  "https://bms-india3.vercel.app/api/showtimes",
-  "https://bms-india.vercel.app/api/showtimes"
+  "https://bms-india3.vercel.app/api/showtimes"
 ];
 const SHOWTIME_API_RETRY_ROUNDS = 3;
 const SHOWTIME_API_RETRY_DELAY_MS = 700;
+const SHOWTIME_API_TIMEOUT_MS = 3500;
 const LAST_GOOD_CACHE_MAX_AGE_MS = 1000 * 60 * 60 * 6;
 
 const SHOWTIME_API_HEADERS = {
@@ -193,7 +194,11 @@ export async function fetchMadanapalleShowtimesPayload({
 
         const response = await fetchImpl(url, {
           cache: "no-store",
-          headers: SHOWTIME_API_HEADERS
+          headers: SHOWTIME_API_HEADERS,
+          signal:
+            typeof AbortSignal !== "undefined" && typeof AbortSignal.timeout === "function"
+              ? AbortSignal.timeout(SHOWTIME_API_TIMEOUT_MS)
+              : undefined
         });
         const text = await response.text();
 

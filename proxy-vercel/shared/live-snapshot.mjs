@@ -8,54 +8,19 @@ import {
   discoverTheatreDateShows,
   MADANAPALLE_THEATRES
 } from "./theatre-discovery.mjs";
+import { readBoxofficeSnapshot } from "./upstash-boxoffice.mjs";
 
 export const DEFAULT_SNAPSHOT_BASE_URL = "https://sathvikm9.github.io/MPLTracking/data";
 const DEFAULT_FUTURE_SCAN_DAYS = 9;
 const MAX_FUTURE_SCAN_DAYS = 21;
 const MADANAPALLE_EVENT_SEARCH_URL = "https://search.contactbfilmy.workers.dev/";
+const BOXOFFICE24_FLAT_MOVIES_URL = "https://boxoffice24.pages.dev/flatmovies.json";
 const EVENT_CATALOG_CACHE_MAX_AGE_MS = 1000 * 60 * 15;
-const MADANAPALLE_SEED_EVENTS = [
-  {
-    eventCode: "ET00434252",
-    title: "Sathi Leelavathi"
-  },
-  {
-    eventCode: "ET00455003",
-    title: "Veerabhadrudu"
-  },
-  {
-    eventCode: "ET00342988",
-    title: "KD (Telugu)"
-  },
-  {
-    eventCode: "ET00496966",
-    title: "Kara (Telugu)"
-  },
-  {
-    eventCode: "ET00493691",
-    title: "Harudu"
-  },
-  {
-    eventCode: "ET00301010",
-    title: "Krishna"
-  },
-  {
-    eventCode: "ET00355891",
-    title: "Andhrawala"
-  },
-  {
-    eventCode: "ET00495010",
-    title: "Godari Gattupaina"
-  },
-  {
-    eventCode: "ET00488038",
-    title: "Mr. Work From Home"
-  }
-];
 
 const eventCatalogCache = globalThis.__MADANAPALLE_EVENT_CATALOG_CACHE__ || {
   cachedAtMs: 0,
-  movies: []
+  movies: [],
+  source: ""
 };
 globalThis.__MADANAPALLE_EVENT_CATALOG_CACHE__ = eventCatalogCache;
 const ALL_TRACKING_THEATRES = [...MADANAPALLE_THEATRES, SAI_CHITRA_THEATRE];
@@ -81,9 +46,9 @@ const MADANAPALLE_VISIBLE_DATE_SEEDS = [
   ["MSDR", "2026-05-16", 4, "Krishna, Harudu"],
   ["MSDR", "2026-05-17", 4, "Krishna, Harudu"],
   ["MSDR", "2026-05-18", 4, "Kara, Harudu"],
-  ["MSDR", "2026-05-19", 4, "Krishna, Harudu"],
-  ["MSDR", "2026-05-20", 5, "Andhrawala, Krishna, Harudu"],
-  ["MSDR", "2026-05-21", 4, "Krishna, Harudu"],
+  ["MSDR", "2026-05-19", 4, "Kara, Harudu"],
+  ["MSDR", "2026-05-20", 5, "Andhrawala"],
+  ["MSDR", "2026-05-21", 4, "Kara, Harudu"],
   ["SKMD", "2026-05-14", 1, "Godari Gattupaina"],
   ["SKMD", "2026-05-15", 4, "Mr. Work From Home, Godari Gattupaina"],
   ["SKMD", "2026-05-16", 4, "Mr. Work From Home, Godari Gattupaina"],
@@ -115,9 +80,9 @@ const MADANAPALLE_VISIBLE_EVENT_SEEDS = [
   ["MSDR", "2026-05-16", ["ET00301010", "ET00493691"]],
   ["MSDR", "2026-05-17", ["ET00301010", "ET00493691"]],
   ["MSDR", "2026-05-18", ["ET00496966", "ET00493691"]],
-  ["MSDR", "2026-05-19", ["ET00301010", "ET00493691"]],
-  ["MSDR", "2026-05-20", ["ET00355891", "ET00301010", "ET00493691"]],
-  ["MSDR", "2026-05-21", ["ET00301010", "ET00493691"]],
+  ["MSDR", "2026-05-19", ["ET00496966", "ET00493691"]],
+  ["MSDR", "2026-05-20", ["ET00355891"]],
+  ["MSDR", "2026-05-21", ["ET00496966", "ET00493691"]],
   ["SKMD", "2026-05-14", ["ET00495010"]],
   ["SKMD", "2026-05-15", ["ET00488038", "ET00495010"]],
   ["SKMD", "2026-05-16", ["ET00488038", "ET00495010"]],
@@ -143,6 +108,73 @@ function isoToDateCode(date) {
 
 function eventCodeFromMovie(movie) {
   return String(movie?.id || movie?.eventCode || movie?.DefaultEventCode || "").trim().toUpperCase();
+}
+
+function normalizeCatalogMovieEntry({
+  eventCode,
+  title,
+  releaseDate = "",
+  status = "",
+  language = "",
+  format = "",
+  source = ""
+}) {
+  const normalizedEventCode = String(eventCode || "").trim().toUpperCase();
+  if (!/^ET\d+$/i.test(normalizedEventCode)) return null;
+
+  return {
+    eventCode: normalizedEventCode,
+    title: String(title || "").trim(),
+    slug: "",
+    releaseDate: String(releaseDate || ""),
+    status: String(status || ""),
+    language: String(language || ""),
+    format: String(format || ""),
+    source: String(source || "")
+  };
+}
+
+function dedupeCatalogMovies(movies) {
+  const byEventCode = new Map();
+
+  for (const movie of movies || []) {
+    if (!movie?.eventCode) continue;
+    if (!byEventCode.has(movie.eventCode)) {
+      byEventCode.set(movie.eventCode, movie);
+      continue;
+    }
+
+    const existing = byEventCode.get(movie.eventCode);
+    byEventCode.set(movie.eventCode, {
+      ...existing,
+      ...movie,
+      title: movie.title || existing.title,
+      language: movie.language || existing.language,
+      format: movie.format || existing.format
+    });
+  }
+
+  return [...byEventCode.values()].sort((a, b) =>
+    String(a.title || a.eventCode).localeCompare(String(b.title || b.eventCode))
+  );
+}
+
+async function mapWithConcurrency(items, limit, mapper) {
+  const results = new Array(items.length);
+  let cursor = 0;
+  const workerCount = Math.min(Math.max(Number(limit) || 1, 1), items.length || 1);
+
+  await Promise.all(
+    Array.from({ length: workerCount }, async () => {
+      while (cursor < items.length) {
+        const index = cursor;
+        cursor += 1;
+        results[index] = await mapper(items[index], index);
+      }
+    })
+  );
+
+  return results;
 }
 
 function dateCodeToIso(dateCode) {
@@ -549,6 +581,8 @@ function buildSummary(shows) {
 }
 
 function buildOutputFromBaseline(baseline, shows, notes = []) {
+  const normalizedShows = dedupeShowsBySlot(shows);
+
   return {
     version: baseline.version || 1,
     generatedAt: new Date().toISOString(),
@@ -565,15 +599,56 @@ function buildOutputFromBaseline(baseline, shows, notes = []) {
     targetDateCode: baseline.targetDateCode,
     timezone: baseline.timezone,
     city: baseline.city,
-    summary: buildSummary(shows),
-    movies: summarizeByMovie(shows),
-    theatres: summarizeByTheatre(shows),
-    shows: [...shows].sort((left, right) => left.showDateTime.localeCompare(right.showDateTime)),
+    summary: buildSummary(normalizedShows),
+    movies: summarizeByMovie(normalizedShows),
+    theatres: summarizeByTheatre(normalizedShows),
+    shows: [...normalizedShows].sort((left, right) => left.showDateTime.localeCompare(right.showDateTime)),
     meta: {
       ...(baseline.meta || {}),
       status: "ok",
       notes,
       liveProxy: true
+    }
+  };
+}
+
+function showSlotKey(show) {
+  return [
+    show?.venueCode || "",
+    show?.showDate || "",
+    show?.showDateTimeCode || show?.showDateTime || show?.showTimeLabel || ""
+  ].join("::");
+}
+
+function dedupeShowsBySlot(shows) {
+  const bySlot = new Map();
+
+  for (const show of shows || []) {
+    const key = showSlotKey(show);
+    if (!key.replace(/:/g, "")) continue;
+    bySlot.set(key, show);
+  }
+
+  return [...bySlot.values()];
+}
+
+function mergeLiveOutputsBySlot({ date, baseOutput, overlayOutput, notes = [] }) {
+  const mergedShows = dedupeShowsBySlot([
+    ...((baseOutput && baseOutput.shows) || []),
+    ...((overlayOutput && overlayOutput.shows) || [])
+  ]);
+  const output = buildOutputFromBaseline(buildDiscoveryBaseline(null, date), mergedShows, notes);
+
+  return {
+    ...output,
+    meta: {
+      ...((baseOutput && baseOutput.meta) || {}),
+      ...((overlayOutput && overlayOutput.meta) || {}),
+      notes: [
+        ...notes,
+        ...(((baseOutput && baseOutput.meta) || {}).notes || []),
+        ...(((overlayOutput && overlayOutput.meta) || {}).notes || [])
+      ]
     }
   };
 }
@@ -700,18 +775,62 @@ function eventCodesFromManifest(manifest) {
   return [...eventCodes].sort();
 }
 
-async function fetchMadanapalleEventCatalog(fetchImpl) {
-  const cacheAgeMs = Date.now() - Number(eventCatalogCache.cachedAtMs || 0);
-  if (eventCatalogCache.movies.length && cacheAgeMs < EVENT_CATALOG_CACHE_MAX_AGE_MS) {
-    return {
-      movies: eventCatalogCache.movies,
-      cache: {
-        hit: true,
-        ageMs: cacheAgeMs
-      }
-    };
+async function fetchBoxOffice24FlatMovieCatalog(fetchImpl) {
+  const response = await fetchImpl(`${BOXOFFICE24_FLAT_MOVIES_URL}?_=${Date.now()}`, {
+    cache: "no-store",
+    headers: {
+      accept: "application/json, text/plain, */*",
+      "cache-control": "no-cache",
+      pragma: "no-cache",
+      referer: "https://boxoffice24.pages.dev/",
+      "user-agent":
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36"
+    }
+  });
+
+  if (!response.ok) {
+    throw new Error(`BoxOffice24 flat movie catalog failed: ${response.status}`);
   }
 
+  const payload = await response.json();
+  const rawMovies = Array.isArray(payload) ? payload : payload.movies || [];
+  const movies = [];
+
+  for (const movie of rawMovies) {
+    const variants = Array.isArray(movie?.Variants) ? movie.Variants : [];
+    const entries = variants.length
+      ? variants
+      : [
+          {
+            EventCode: movie?.DefaultEventCode,
+            VariantName: movie?.Title || movie?.name || movie?.title,
+            Language: movie?.Language || movie?.language,
+            Format: movie?.Format || movie?.format
+          }
+        ];
+
+    for (const variant of entries) {
+      const language = String(variant?.Language || "").trim();
+      if (language && language.toLowerCase() !== "telugu") continue;
+
+      const normalized = normalizeCatalogMovieEntry({
+        eventCode: variant?.EventCode || movie?.DefaultEventCode,
+        title: variant?.VariantName || movie?.Title || movie?.name || movie?.title,
+        releaseDate: movie?.EventDate || movie?.releaseDate,
+        status: movie?.isNewEvent || movie?.status || "FlatMovies",
+        language,
+        format: variant?.Format || movie?.Format || movie?.format,
+        source: "boxoffice24-flatmovies"
+      });
+
+      if (normalized) movies.push(normalized);
+    }
+  }
+
+  return dedupeCatalogMovies(movies);
+}
+
+async function fetchContactBfilmyEventCatalog(fetchImpl) {
   const url = new URL(MADANAPALLE_EVENT_SEARCH_URL);
   url.searchParams.set("r", "MDNP");
   url.searchParams.set("_", String(Date.now()));
@@ -728,50 +847,85 @@ async function fetchMadanapalleEventCatalog(fetchImpl) {
   });
 
   if (!response.ok) {
-    throw new Error(`Madanapalle event catalog failed: ${response.status}`);
+    throw new Error(`Contact BFilmy event catalog failed: ${response.status}`);
   }
 
   const payload = await response.json();
-  const movies = (payload.movies || [])
-    .map((movie) => ({
-      eventCode: eventCodeFromMovie(movie),
-      title: movie.name || movie.Title || movie.title || "",
-      slug: movie.slug || "",
-      releaseDate: movie.releaseDate || movie.EventDate || "",
-      status: movie.status || ""
-    }))
-    .filter((movie) => /^ET\d+$/i.test(movie.eventCode));
+  return dedupeCatalogMovies(
+    (payload.movies || [])
+      .map((movie) =>
+        normalizeCatalogMovieEntry({
+          eventCode: eventCodeFromMovie(movie),
+          title: movie.name || movie.Title || movie.title || "",
+          releaseDate: movie.releaseDate || movie.EventDate || "",
+          status: movie.status || "",
+          language: movie.language || movie.Language || "",
+          format: movie.format || movie.Format || "",
+          source: "contactbfilmy-worker"
+        })
+      )
+      .filter(Boolean)
+  );
+}
 
-  for (const seed of MADANAPALLE_SEED_EVENTS) {
-    if (!movies.some((movie) => movie.eventCode === seed.eventCode)) {
-      movies.push({
-        eventCode: seed.eventCode,
-        title: seed.title,
-        slug: "",
-        releaseDate: "",
-        status: "Seed"
-      });
+async function fetchMadanapalleEventCatalog(fetchImpl) {
+  const cacheAgeMs = Date.now() - Number(eventCatalogCache.cachedAtMs || 0);
+  if (eventCatalogCache.movies.length && cacheAgeMs < EVENT_CATALOG_CACHE_MAX_AGE_MS) {
+    return {
+      movies: eventCatalogCache.movies,
+      source: eventCatalogCache.source || "cache",
+      cache: {
+        hit: true,
+        ageMs: cacheAgeMs
+      }
+    };
+  }
+
+  const loaders = [
+    {
+      source: "boxoffice24-flatmovies",
+      load: () => fetchBoxOffice24FlatMovieCatalog(fetchImpl)
+    },
+    {
+      source: "contactbfilmy-worker",
+      load: () => fetchContactBfilmyEventCatalog(fetchImpl)
+    }
+  ];
+  const errors = [];
+
+  for (const loader of loaders) {
+    try {
+      const movies = await loader.load();
+      if (!movies.length) {
+        errors.push(`${loader.source}: empty catalog`);
+        continue;
+      }
+
+      eventCatalogCache.movies = movies;
+      eventCatalogCache.cachedAtMs = Date.now();
+      eventCatalogCache.source = loader.source;
+
+      return {
+        movies,
+        source: loader.source,
+        cache: {
+          hit: false,
+          ageMs: 0
+        }
+      };
+    } catch (error) {
+      errors.push(`${loader.source}: ${error.message}`);
     }
   }
 
-  eventCatalogCache.movies = movies;
-  eventCatalogCache.cachedAtMs = Date.now();
-
-  return {
-    movies,
-    cache: {
-      hit: false,
-      ageMs: 0
-    }
-  };
+  throw new Error(errors.join(" | ") || "Madanapalle event catalog failed.");
 }
 
 async function eventCodesFromMadanapalleCatalog(fetchImpl, notes = []) {
   try {
     const catalog = await fetchMadanapalleEventCatalog(fetchImpl);
-    const seedCodes = MADANAPALLE_SEED_EVENTS.map((movie) => movie.eventCode);
     const discoveredCodes = catalog.movies.map((movie) => movie.eventCode);
-    const eventCodes = [...new Set([...seedCodes, ...discoveredCodes])].filter(Boolean);
+    const eventCodes = [...new Set(discoveredCodes)].filter(Boolean);
     if (!eventCodes.length) {
       notes.push("Madanapalle event catalog returned no current BookMyShow movies.");
     }
@@ -1005,20 +1159,35 @@ async function discoverLiveShowsForDate({
     eventCodes = [...new Set(seedBaseline.shows.map((show) => show.eventCode).filter(Boolean))];
   }
 
-  for (const eventCode of eventCodes) {
+  const eventResults = await mapWithConcurrency(
+    eventCodes,
+    10,
+    async (eventCode) => {
+      try {
+        const { payload, meta } = await fetchMadanapalleShowtimesPayload({
+          eventCode,
+          dateCode: targetDateCode,
+          venueCode,
+          retryRounds,
+          allowLastGoodCache,
+          fetchImpl
+        });
+
+        return { eventCode, payload, meta };
+      } catch (error) {
+        return { eventCode, error };
+      }
+    }
+  );
+
+  for (const result of eventResults) {
+    const { eventCode } = result;
     try {
-      const { payload, meta } = await fetchMadanapalleShowtimesPayload({
-        eventCode,
-        dateCode: targetDateCode,
-        venueCode,
-        retryRounds,
-        allowLastGoodCache,
-        fetchImpl
-      });
+      if (result.error) throw result.error;
 
-      if (meta?.cache?.hit) cachedEventCodes.push(eventCode);
+      if (result.meta?.cache?.hit) cachedEventCodes.push(eventCode);
 
-      for (const snapshot of buildDiscoverySnapshotsFromPayload(payload, theatreMap, targetDateCode)) {
+      for (const snapshot of buildDiscoverySnapshotsFromPayload(result.payload, theatreMap, targetDateCode)) {
         snapshotsById.set(snapshot.id, snapshot);
       }
 
@@ -1229,22 +1398,108 @@ async function buildCatalogLiveSnapshot({
   retryRounds = 2
 }) {
   const notes = [];
+  const storedHints = await storedEventHintsForVenueDate(venueCode, date, notes);
   const seededEventCodes = seededEventCodesForVenueDate(venueCode, date);
+  const exactEventCodes = [...new Set(storedHints.eventCodes)].filter(Boolean);
+  const exactExpectedShowCount = storedHints.totalShows;
   const { eventCodes: catalogEventCodes, catalog } = await eventCodesFromMadanapalleCatalog(
     fetchImpl,
     notes
   );
-  const eventCodes = seededEventCodes.length ? seededEventCodes : catalogEventCodes;
-  const output = await discoverLiveShowsForDate({
-    fetchImpl,
-    snapshotBaseUrl,
-    targetDate: date,
-    venueCode,
-    seedBaseline: null,
-    retryRounds,
-    eventCodes,
-    allowLastGoodCache
-  });
+  let seedOutputForFallback = null;
+
+  if (venueCode && exactEventCodes.length) {
+    const seedErrors = [];
+
+    for (let attempt = 1; attempt <= 2; attempt += 1) {
+      try {
+        const seedOutput = await discoverLiveShowsForDate({
+          fetchImpl,
+          snapshotBaseUrl,
+          targetDate: date,
+          venueCode,
+          seedBaseline: null,
+          retryRounds: Math.min(Number(retryRounds || 1), 2),
+          eventCodes: exactEventCodes,
+          allowLastGoodCache
+        });
+
+        if (
+          (seedOutput.shows || []).length >
+          (seedOutputForFallback?.shows || []).length
+        ) {
+          seedOutputForFallback = seedOutput;
+        }
+      } catch (error) {
+        seedErrors.push(error.message);
+      }
+    }
+
+    if (seedOutputForFallback) {
+      notes.push(
+        `Selected theatre/date event hints returned ${(seedOutputForFallback.shows || []).length} of ${
+          exactExpectedShowCount || "unknown"
+        } expected shows after retry, so the live catalog scan was attempted.`
+      );
+    } else if (seedErrors.length) {
+      notes.push(`Selected theatre/date event hint scan failed: ${seedErrors.join(" | ")}`);
+    }
+  }
+
+  const eventCodes = [...new Set([...seededEventCodes, ...exactEventCodes, ...catalogEventCodes])].filter(Boolean);
+  let output;
+  try {
+    output = await discoverLiveShowsForDate({
+      fetchImpl,
+      snapshotBaseUrl,
+      targetDate: date,
+      venueCode,
+      seedBaseline: null,
+      retryRounds: Math.min(Number(retryRounds || 1), 1),
+      eventCodes,
+      allowLastGoodCache
+    });
+  } catch (error) {
+    if (seedOutputForFallback) {
+      output = {
+        ...seedOutputForFallback,
+        meta: {
+          ...(seedOutputForFallback.meta || {}),
+          notes: [
+            "The broad live catalog scan failed after exact theatre/date hints returned partial live data, so the partial exact live rows are shown.",
+            ...notes,
+            ...((seedOutputForFallback.meta && seedOutputForFallback.meta.notes) || [])
+          ]
+        }
+      };
+    } else {
+      throw error;
+    }
+  }
+  if (seedOutputForFallback && (output.shows || []).length) {
+    output = mergeLiveOutputsBySlot({
+      date,
+      baseOutput: seedOutputForFallback,
+      overlayOutput: output,
+      notes: [
+        "Exact theatre/date hints were merged with the current movie catalog; catalog rows win for the same theatre and showtime.",
+        ...notes
+      ]
+    });
+  }
+  if (seedOutputForFallback && !(output.shows || []).length) {
+    output = {
+      ...seedOutputForFallback,
+      meta: {
+        ...(seedOutputForFallback.meta || {}),
+        notes: [
+          "The broad live catalog scan returned no selected-theatre rows after exact theatre/date hints returned partial live data, so the partial exact live rows are shown.",
+          ...notes,
+          ...((seedOutputForFallback.meta && seedOutputForFallback.meta.notes) || [])
+        ]
+      }
+    };
+  }
   const liveRefresh = output.meta?.liveRefresh || {};
   if (
     !allowLastGoodCache &&
@@ -1272,6 +1527,10 @@ async function buildCatalogLiveSnapshot({
       eventCatalog: {
         attemptedMovies: eventCodes.length,
         seededSelection: Boolean(seededEventCodes.length),
+        seedCount: seededEventCodes.length,
+        storedHintCount: storedHints.eventCodes.length,
+        catalogCount: catalogEventCodes.length,
+        source: catalog.source || "",
         cache: catalog.cache
       },
       notes: [...notes, ...((output.meta && output.meta.notes) || [])]
@@ -1736,6 +1995,35 @@ function seededEventCodesForVenueDate(venueCode, date) {
         .flatMap((entry) => entry[2])
     )
   ];
+}
+
+async function storedEventHintsForVenueDate(venueCode, date, notes = []) {
+  if (!venueCode || !date) {
+    return {
+      eventCodes: [],
+      totalShows: 0
+    };
+  }
+
+  try {
+    const snapshot = await readBoxofficeSnapshot(date);
+    const shows = (snapshot?.plannedShows || []).filter(
+      (show) => show?.venueCode === venueCode && show?.showDate === date
+    );
+
+    return {
+      eventCodes: [
+        ...new Set(shows.map((show) => String(show.eventCode || "").trim().toUpperCase()).filter(Boolean))
+      ],
+      totalShows: shows.length
+    };
+  } catch (error) {
+    notes.push(`Stored boxoffice planned-show hints could not be loaded: ${error.message}`);
+    return {
+      eventCodes: [],
+      totalShows: 0
+    };
+  }
 }
 
 function buildAvailabilityOnlyEntry(dateOption, theatre) {
