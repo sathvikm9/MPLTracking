@@ -1069,7 +1069,8 @@ async function buildCatalogLiveSnapshotWithVenueFallback({
   snapshotBaseUrl,
   allowLastGoodCache,
   retryRounds,
-  requireComplete = false
+  requireComplete = false,
+  allowPartialEvents = false
 }) {
   try {
     return await buildCatalogLiveSnapshot({
@@ -1079,7 +1080,8 @@ async function buildCatalogLiveSnapshotWithVenueFallback({
       snapshotBaseUrl,
       allowLastGoodCache,
       retryRounds,
-      requireComplete
+      requireComplete,
+      allowPartialEvents
     });
   } catch (error) {
     if (!venueCode || isSaiChitraVenue(venueCode)) throw error;
@@ -1094,7 +1096,8 @@ async function buildCatalogLiveSnapshotWithVenueFallback({
           snapshotBaseUrl,
           allowLastGoodCache,
           retryRounds: Math.min(Number(retryRounds || 1) + 1, 6),
-          requireComplete
+          requireComplete,
+          allowPartialEvents
         });
       } catch {
         throw error;
@@ -1108,7 +1111,8 @@ async function buildCatalogLiveSnapshotWithVenueFallback({
       snapshotBaseUrl,
       allowLastGoodCache,
       retryRounds,
-      requireComplete
+      requireComplete,
+      allowPartialEvents
     });
     const filteredOutput = filterOutputByVenueCode(bulkOutput, venueCode);
     if (!filteredOutput.shows?.length) throw error;
@@ -1400,7 +1404,8 @@ async function buildCatalogLiveSnapshot({
   snapshotBaseUrl,
   allowLastGoodCache = true,
   retryRounds = 2,
-  requireComplete = false
+  requireComplete = false,
+  allowPartialEvents = false
 }) {
   const notes = [];
   const storedHints = await storedEventHintsForVenueDate(venueCode, date, notes);
@@ -1520,6 +1525,7 @@ async function buildCatalogLiveSnapshot({
     throw new Error("Live mirror fallback failed for all selected events.");
   }
   if (
+    !allowPartialEvents &&
     (!allowLastGoodCache || requireComplete) &&
     venueCode &&
     expectedEventCodes.length > 1 &&
@@ -1562,6 +1568,7 @@ async function buildCatalogLiveSnapshot({
         catalogCount: catalogEventCodes.length,
         expectedShowCount,
         requireComplete,
+        allowPartialEvents,
         expectedEventCodes,
         missingExpectedEventCodes,
         source: catalog.source || "",
@@ -1654,6 +1661,7 @@ export async function buildLiveSnapshot({
   const strictLiveOnly = url.searchParams.get("strict") === "1" || liveOnly;
   const mirrorOnly = url.searchParams.get("mirrorOnly") === "1";
   const requireComplete = url.searchParams.get("requireComplete") === "1";
+  const allowPartialEvents = url.searchParams.get("allowPartialEvents") === "1";
   const allowLastGoodCache = !strictLiveOnly && url.searchParams.get("allowCache") !== "0";
   const mirrorRetryRounds = Math.min(
     Math.max(Number(url.searchParams.get("mirrorRetryRounds") || (strictLiveOnly ? 4 : 2)), 1),
@@ -1677,7 +1685,8 @@ export async function buildLiveSnapshot({
         snapshotBaseUrl,
         allowLastGoodCache,
         retryRounds: mirrorRetryRounds,
-        requireComplete
+        requireComplete,
+        allowPartialEvents
       });
       return venueCode ? output : mergeSaiChitraLiveSnapshot(output, { date, fetchImpl });
     } catch (error) {
@@ -1704,7 +1713,8 @@ export async function buildLiveSnapshot({
         snapshotBaseUrl,
         allowLastGoodCache,
         retryRounds: mirrorRetryRounds,
-        requireComplete
+        requireComplete,
+        allowPartialEvents
       });
 
       const fallbackOutput = {

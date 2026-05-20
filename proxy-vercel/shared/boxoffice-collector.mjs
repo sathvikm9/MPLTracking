@@ -116,6 +116,12 @@ function removePlannedShowsForTheatreDate(plannedByKey, venueCode, date) {
   }
 }
 
+function plannedShowsForTheatreDate(plannedByKey, venueCode, date) {
+  return Array.from(plannedByKey.values()).filter(
+    (show) => show?.venueCode === venueCode && show?.showDate === date
+  );
+}
+
 function compareShows(left, right) {
   const timeCompare = String(left.showDateTime || "").localeCompare(String(right.showDateTime || ""));
   if (timeCompare) return timeCompare;
@@ -260,8 +266,8 @@ function buildLiveSnapshotUrl({ liveApiBase, date, venueCode, isTicketNew }) {
   url.searchParams.set("venueCode", venueCode);
   url.searchParams.set("mirrorRetryRounds", isTicketNew ? "1" : "6");
   if (!isTicketNew) {
+    url.searchParams.set("allowPartialEvents", "1");
     url.searchParams.set("mirrorOnly", "1");
-    url.searchParams.set("requireComplete", "1");
   }
   url.searchParams.set("ts", String(Date.now()));
   return url;
@@ -293,7 +299,7 @@ async function fetchLiveSnapshotUrl({ url, expectedDate, isTicketNew, fetchImpl 
 async function fetchLiveTheatreSnapshot({ liveApiBase, date, venueCode, fetchImpl = fetch }) {
   const normalizedVenueCode = String(venueCode || "").toUpperCase();
   const isTicketNew = TICKETNEW_THEATRES.has(normalizedVenueCode);
-  const directUrl = buildLiveSnapshotUrl({
+  const url = buildLiveSnapshotUrl({
     liveApiBase,
     date,
     venueCode: normalizedVenueCode,
@@ -301,7 +307,7 @@ async function fetchLiveTheatreSnapshot({ liveApiBase, date, venueCode, fetchImp
   });
 
   return fetchLiveSnapshotUrl({
-    url: directUrl,
+    url,
     expectedDate: date,
     isTicketNew,
     fetchImpl
@@ -366,13 +372,18 @@ export async function collectBoxofficeSnapshot({
           note: "Fallback theatre capture policy."
         };
 
-        removePlannedShowsForTheatreDate(plannedByKey, theatre.venueCode, date);
+        const incomingShows = (snapshot.shows || []).filter(
+          (show) => show.showDate === date && show.venueCode === theatre.venueCode && show.showDateTime
+        );
+        const existingPlannedShows = plannedShowsForTheatreDate(plannedByKey, theatre.venueCode, date);
+        const shouldReplacePlan =
+          !existingPlannedShows.length || incomingShows.length >= existingPlannedShows.length;
 
-        for (const show of snapshot.shows || []) {
-          if (show.showDate !== date) continue;
-          if (show.venueCode !== theatre.venueCode) continue;
-          if (!show.showDateTime) continue;
+        if (shouldReplacePlan) {
+          removePlannedShowsForTheatreDate(plannedByKey, theatre.venueCode, date);
+        }
 
+        for (const show of incomingShows) {
           const captureAt = resolveCaptureAt(show, policy);
           const key = captureKey(show);
           plannedByKey.set(key, {
