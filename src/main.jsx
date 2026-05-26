@@ -5,6 +5,8 @@ import "./styles.css";
 
 const INDIA_TIMEZONE = "Asia/Kolkata";
 const SERVER_ERROR_MESSAGE = "Server is not responding, please try again later.";
+const LIVE_TRACKING_UNAVAILABLE_MESSAGE =
+  "BMS live theatre data is blocked right now; showing any available fallback rows.";
 const THEATRE_SELECTION_MESSAGE = "Select a theatre or All Theatres to load live data.";
 const LAST_GOOD_DASHBOARD_CACHE_PREFIX = "mpltracking:last-good-live";
 const LAST_GOOD_DASHBOARD_CACHE_MAX_AGE_MS = 1000 * 60 * 60 * 6;
@@ -785,6 +787,14 @@ function isLiveCountFailure(data) {
   );
 }
 
+function isGracefulLiveFallback(data) {
+  return (
+    data?.meta?.status !== "error" &&
+    data?.targetDate &&
+    Array.isArray(data?.shows)
+  );
+}
+
 function readLastGoodDashboard(selectedDate, selectedTheatre) {
   if (typeof window === "undefined") return null;
 
@@ -949,8 +959,10 @@ function useDashboardData(selectedDate, selectedTheatre) {
         theatreCode !== "SAIC";
 
       liveUrl.searchParams.set("date", selectedDate);
-      liveUrl.searchParams.set("liveOnly", "1");
-      liveUrl.searchParams.set("allowCache", "0");
+      if (params.strictLive !== false) {
+        liveUrl.searchParams.set("liveOnly", "1");
+        liveUrl.searchParams.set("allowCache", "0");
+      }
       liveUrl.searchParams.set("ts", String(Date.now()));
 
       if (theatreCode !== "ALL" && !useBulkBmsMirror) {
@@ -958,7 +970,7 @@ function useDashboardData(selectedDate, selectedTheatre) {
       }
 
       for (const [key, value] of Object.entries(params)) {
-        if (key === "forceVenue") continue;
+        if (key === "forceVenue" || key === "strictLive" || key === "acceptFallback") continue;
         liveUrl.searchParams.set(key, String(value));
       }
 
@@ -980,6 +992,11 @@ function useDashboardData(selectedDate, selectedTheatre) {
               {
                 mode: "live-proxy-theatre-backup",
                 url: buildLiveUrl({ mirrorRetryRounds: 2 }, theatreCode)
+              },
+              {
+                mode: "live-proxy-graceful-fallback",
+                acceptFallback: true,
+                url: buildLiveUrl({ mirrorRetryRounds: 2, strictLive: false }, theatreCode)
               }
             ];
       let lastError = null;
@@ -987,7 +1004,14 @@ function useDashboardData(selectedDate, selectedTheatre) {
       for (const attempt of theatreAttempts) {
         try {
           const liveData = await fetchJson(attempt.url.toString());
-          if (liveData.targetDate !== selectedDate || isLiveCountFailure(liveData)) {
+          if (liveData.targetDate !== selectedDate) {
+            throw new Error(SERVER_ERROR_MESSAGE);
+          }
+
+          if (
+            isLiveCountFailure(liveData) &&
+            !(attempt.acceptFallback && isGracefulLiveFallback(liveData))
+          ) {
             throw new Error(SERVER_ERROR_MESSAGE);
           }
 
@@ -1020,12 +1044,9 @@ function useDashboardData(selectedDate, selectedTheatre) {
         throw failures[0]?.result.reason || new Error(SERVER_ERROR_MESSAGE);
       }
 
-      if (failures.length) {
-        throw failures[0]?.result.reason || new Error(SERVER_ERROR_MESSAGE);
-      }
-
       const notes = failures.map(
-        (entry) => `${THEATRE_BY_CODE.get(entry.theatreCode) || entry.theatreCode} failed live refresh.`
+        (entry) =>
+          `${THEATRE_BY_CODE.get(entry.theatreCode) || entry.theatreCode} failed live refresh because BMS live access is blocked.`
       );
       const merged = mergeLiveTheatreResponses(successes, selectedDate, notes);
 
@@ -1048,6 +1069,11 @@ function useDashboardData(selectedDate, selectedTheatre) {
       {
         mode: "live-proxy-theatre-backup",
         url: buildLiveUrl({ mirrorRetryRounds: 2 })
+      },
+      {
+        mode: "live-proxy-graceful-fallback",
+        acceptFallback: true,
+        url: buildLiveUrl({ mirrorRetryRounds: 2, strictLive: false })
       }
     ];
     let lastError = null;
@@ -1059,7 +1085,10 @@ function useDashboardData(selectedDate, selectedTheatre) {
           throw new Error(SERVER_ERROR_MESSAGE);
         }
 
-        if (isLiveCountFailure(liveData)) {
+        if (
+          isLiveCountFailure(liveData) &&
+          !(attempt.acceptFallback && isGracefulLiveFallback(liveData))
+        ) {
           throw new Error(SERVER_ERROR_MESSAGE);
         }
 
@@ -1103,6 +1132,7 @@ function useDashboardData(selectedDate, selectedTheatre) {
       if (!active) return;
 
       if (result.ok) {
+        writeLastGoodDashboard(selectedDate, selectedTheatre, result.data);
         setState({
           loading: false,
           refreshing: false,
@@ -1116,19 +1146,20 @@ function useDashboardData(selectedDate, selectedTheatre) {
         loading: false,
         refreshing: false,
         error: result.error,
-        data: null
+        data: readLastGoodDashboard(selectedDate, selectedTheatre)
       });
     });
 
     return () => {
       active = false;
     };
-  }, [loadData]);
+  }, [loadData, selectedDate, selectedTheatre]);
 
   const refresh = React.useCallback(() => {
     loadData("refresh").then((result) => {
       setState((current) => {
         if (result.ok) {
+          writeLastGoodDashboard(selectedDate, selectedTheatre, result.data);
           return {
             loading: false,
             refreshing: false,
@@ -1141,11 +1172,11 @@ function useDashboardData(selectedDate, selectedTheatre) {
           loading: false,
           refreshing: false,
           error: result.error,
-          data: null
+          data: current.data || readLastGoodDashboard(selectedDate, selectedTheatre)
         };
       });
     });
-  }, [loadData]);
+  }, [loadData, selectedDate, selectedTheatre]);
 
   return { ...state, refresh };
 }
@@ -1639,7 +1670,7 @@ function LiveTrackingScreen({ screenSwitcher }) {
 
   const selectedTheatreLabel =
     THEATRE_OPTIONS.find((option) => option.value === selectedTheatre)?.label || "Select theatre";
-  const safeData = error || !data ? buildEmptyDataset(selectedDate) : data;
+  const safeData = data || buildEmptyDataset(selectedDate);
   const allShows = [...(safeData.shows || [])].sort(compareShows);
   const filteredShows =
     !selectedTheatre
@@ -1653,21 +1684,24 @@ function LiveTrackingScreen({ screenSwitcher }) {
   const generatedLabel = data ? formatGeneratedAt(data) : "Not loaded yet";
   const ageLabel = data ? snapshotAgeLabel(data.generatedAt) : "Waiting for live API";
   const isBusy = loading || refreshing;
+  const hasBmsBlockedNote = (data?.meta?.notes || []).some((note) =>
+    String(note).toLowerCase().includes("cloudflare")
+  );
   const statusMessage = !selectedTheatre
     ? THEATRE_SELECTION_MESSAGE
     : loading
       ? `Fetching live data for ${selectedTheatreLabel} on ${formatSelectedDateLabel(selectedDate)}...`
       : refreshing
       ? "Refreshing live data..."
-      : error
-        ? SERVER_ERROR_MESSAGE
+      : error || (hasBmsBlockedNote && !filteredShows.length)
+        ? LIVE_TRACKING_UNAVAILABLE_MESSAGE
         : !filteredShows.length
           ? "No Shows Available for selected date"
           : `${number(filteredShows.length)} live show lines loaded.`;
   const emptyMessage = !selectedTheatre
     ? THEATRE_SELECTION_MESSAGE
-    : error
-      ? SERVER_ERROR_MESSAGE
+    : error || (hasBmsBlockedNote && !filteredShows.length)
+      ? LIVE_TRACKING_UNAVAILABLE_MESSAGE
       : isBusy
       ? "Fetching live data..."
       : "No Shows Available for selected date";
