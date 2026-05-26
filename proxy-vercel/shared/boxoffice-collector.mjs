@@ -454,7 +454,7 @@ async function fetchLiveTheatreSnapshot({ liveApiBase, date, venueCode, fetchImp
 
 function buildOutput({ date, existing, captures, plannedShows, errors, generatedAt, bfilmyFallback }) {
   const sortedCaptures = [...captures].sort(compareShows);
-  const shouldUseBfilmyFallback = Boolean(bfilmyFallback && errors.length);
+  const shouldUseBfilmyFallback = Boolean(bfilmyFallback && errors.length && !sortedCaptures.length);
   const publishedCaptures = shouldUseBfilmyFallback ? [] : sortedCaptures;
 
   return {
@@ -496,6 +496,20 @@ function buildOutput({ date, existing, captures, plannedShows, errors, generated
 export async function applyBfilmyCityFallback(snapshot, { fetchImpl = fetch, generatedAt = new Date().toISOString() } = {}) {
   const errors = snapshot?.meta?.errors || [];
   if (!snapshot || !errors.length) return snapshot;
+
+  const storedCaptures = snapshot.captures?.length ? snapshot.captures : snapshot.partialCaptures || [];
+  if (storedCaptures.length) {
+    return buildOutput({
+      date: snapshot.targetDate,
+      existing: snapshot,
+      captures: storedCaptures,
+      plannedShows: snapshot.plannedShows || [],
+      errors,
+      generatedAt: snapshot.generatedAt || generatedAt,
+      bfilmyFallback: null
+    });
+  }
+
   if (snapshot.meta?.bfilmyFallback?.used && Number(snapshot.meta?.bfilmyFallback?.theatreRows || 0) > 0) {
     return {
       ...snapshot,
