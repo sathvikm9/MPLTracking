@@ -493,7 +493,10 @@ function buildOutput({ date, existing, captures, plannedShows, errors, generated
 
 export async function applyBfilmyCityFallback(snapshot, { fetchImpl = fetch, generatedAt = new Date().toISOString() } = {}) {
   const errors = snapshot?.meta?.errors || [];
-  if (!snapshot || !errors.length || snapshot.meta?.bfilmyFallback?.used) return snapshot;
+  if (!snapshot || !errors.length) return snapshot;
+  if (snapshot.meta?.bfilmyFallback?.used && Number(snapshot.meta?.bfilmyFallback?.theatreRows || 0) > 0) {
+    return snapshot;
+  }
 
   const bfilmyFallback = await fetchBfilmyCityFallback({
     date: snapshot.targetDate,
