@@ -1326,6 +1326,7 @@ function boxofficeNotes(data, usingBfilmyFallback) {
 
   return [
     "BMS theatre-level capture is currently unavailable, so city and movie totals are shown from the BFilmy live aggregate feed.",
+    "BFilmy public data is aggregate-only here, so show-level BMS ledger rows are hidden because they can be partial and will not reconcile with the BFilmy totals.",
     ...extraErrors
   ];
 }
@@ -1431,7 +1432,8 @@ function BoxofficeScreen({ screenSwitcher }) {
   const movies = data?.movies || [];
   const bfilmyFallback = data?.meta?.bfilmyFallback;
   const usingBfilmyFallback = Boolean(bfilmyFallback?.used);
-  const hasBoxofficeSummary = captures.length || number(summary.totalShows) > 0;
+  const visibleCaptures = usingBfilmyFallback ? [] : captures;
+  const hasBoxofficeSummary = visibleCaptures.length || number(summary.totalShows) > 0;
   const emptyMessage =
     error?.status === 404
       ? `No boxoffice captures yet for ${formatSelectedDateLabel(selectedDate)}.`
@@ -1474,7 +1476,7 @@ function BoxofficeScreen({ screenSwitcher }) {
                   ? emptyMessage
                   : usingBfilmyFallback
                     ? `BFilmy live city summary loaded with ${number(summary.totalShows)} shows.`
-                    : `${number(captures.length)} cut-off show captures loaded.`}
+                    : `${number(visibleCaptures.length)} cut-off show captures loaded.`}
             </span>
           </div>
 
@@ -1636,8 +1638,8 @@ function BoxofficeScreen({ screenSwitcher }) {
 
       <Section
         title="Captured Show Ledger"
-        kicker="Stored at each cut-off run"
-        aside={<span className="section__hint">{number(captures.length)} shows</span>}
+        kicker={usingBfilmyFallback ? "Hidden while aggregate fallback is active" : "Stored at each cut-off run"}
+        aside={<span className="section__hint">{number(visibleCaptures.length)} shows</span>}
       >
         <Table
           columns={[
@@ -1649,8 +1651,12 @@ function BoxofficeScreen({ screenSwitcher }) {
             { key: "occupancyPercent", label: "Occ", render: (show) => percent(show.occupancyPercent) },
             { key: "capturedAt", label: "Captured", render: (show) => formatGeneratedAt({ generatedAt: show.capturedAt }) }
           ]}
-          rows={captures.map((show) => ({ ...show, id: show.key || show.id }))}
-          emptyMessage={emptyMessage}
+          rows={visibleCaptures.map((show) => ({ ...show, id: show.key || show.id }))}
+          emptyMessage={
+            usingBfilmyFallback
+              ? "Show-level BMS rows are hidden because the current totals are from BFilmy aggregate data."
+              : emptyMessage
+          }
         />
       </Section>
 

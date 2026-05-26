@@ -455,6 +455,7 @@ async function fetchLiveTheatreSnapshot({ liveApiBase, date, venueCode, fetchImp
 function buildOutput({ date, existing, captures, plannedShows, errors, generatedAt, bfilmyFallback }) {
   const sortedCaptures = [...captures].sort(compareShows);
   const shouldUseBfilmyFallback = Boolean(bfilmyFallback && errors.length);
+  const publishedCaptures = shouldUseBfilmyFallback ? [] : sortedCaptures;
 
   return {
     version: 1,
@@ -468,7 +469,8 @@ function buildOutput({ date, existing, captures, plannedShows, errors, generated
     summary: shouldUseBfilmyFallback ? bfilmyFallback.summary : summarize(sortedCaptures),
     theatres: shouldUseBfilmyFallback ? bfilmyFallback.theatres : summarizeByTheatre(sortedCaptures),
     movies: shouldUseBfilmyFallback ? bfilmyFallback.movies : summarizeByMovie(sortedCaptures),
-    captures: sortedCaptures,
+    captures: publishedCaptures,
+    partialCaptures: shouldUseBfilmyFallback ? sortedCaptures : [],
     plannedShows: [...plannedShows].sort(compareShows),
     meta: {
       status: errors.length ? (shouldUseBfilmyFallback ? "fallback" : "partial") : "ok",
@@ -495,7 +497,11 @@ export async function applyBfilmyCityFallback(snapshot, { fetchImpl = fetch, gen
   const errors = snapshot?.meta?.errors || [];
   if (!snapshot || !errors.length) return snapshot;
   if (snapshot.meta?.bfilmyFallback?.used && Number(snapshot.meta?.bfilmyFallback?.theatreRows || 0) > 0) {
-    return snapshot;
+    return {
+      ...snapshot,
+      captures: [],
+      partialCaptures: snapshot.partialCaptures || snapshot.captures || []
+    };
   }
 
   const bfilmyFallback = await fetchBfilmyCityFallback({
