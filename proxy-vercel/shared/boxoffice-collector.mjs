@@ -146,8 +146,50 @@ function parseBfilmyMovieKey(movieKey) {
   };
 }
 
+function normalizeBfilmyChainVenue(chainName) {
+  const value = String(chainName || "").trim();
+  const normalized = value.toLowerCase();
+
+  if (!normalized.includes("madanapalle")) return null;
+  if (normalized.includes("siddartha")) {
+    return {
+      venueCode: "MSDR",
+      venueName: "Siddartha Cinemas:Screen 2 Dolby Laser,Madanapalle",
+      theatreShortName: "Siddartha"
+    };
+  }
+  if (normalized.includes("sri krishna")) {
+    return {
+      venueCode: "SKMD",
+      venueName: "Sri Krishna A/C 4K Dolby Atmos: Madanapalle",
+      theatreShortName: "Sri Krishna"
+    };
+  }
+  if (normalized.includes("ravi")) {
+    return {
+      venueCode: "RTDM",
+      venueName: "Ravi A/C 4K Laser Dolby Surround 7.1: Madanapalle",
+      theatreShortName: "Ravi"
+    };
+  }
+  if (normalized.includes("asr")) {
+    return {
+      venueCode: "ASRM",
+      venueName: "ASR A/C 4K Laser Dolby Surround 7.1: Madanapalle",
+      theatreShortName: "ASR"
+    };
+  }
+
+  return {
+    venueCode: `BFILMY-${value.replace(/[^A-Za-z0-9]+/g, "-").replace(/^-|-$/g, "").toUpperCase()}`,
+    venueName: value,
+    theatreShortName: value.replace(/:.*$/, "").trim() || "BFilmy venue"
+  };
+}
+
 function buildBfilmyCityFallback({ date, payload, generatedAt }) {
   const captures = [];
+  const venueCaptures = [];
   const moviesPayload = payload?.movies && typeof payload.movies === "object" ? payload.movies : {};
 
   for (const [movieKey, movie] of Object.entries(moviesPayload)) {
@@ -200,6 +242,52 @@ function buildBfilmyCityFallback({ date, payload, generatedAt }) {
         lastUpdated: payload.last_updated || ""
       }
     });
+
+    for (const chainRow of movie?.Chain_details || []) {
+      const venue = normalizeBfilmyChainVenue(chainRow.chain);
+      if (!venue) continue;
+
+      const chainTotalSeats = number(chainRow.totalSeats);
+      const chainSoldSeats = number(chainRow.sold);
+      venueCaptures.push({
+        id: `BFILMY-VENUE-${date}-${movieKey}-${chainRow.chain}`,
+        key: `BFILMY-VENUE::${date}::${movieKey}::${chainRow.chain}`,
+        eventCode: "",
+        sessionId: "",
+        platform: "bfilmy",
+        ...venue,
+        citySlug: CITY.slug,
+        showDate: date,
+        showDateCode: isoToDateCode(date),
+        showDateTime: `${date}T00:00:00+05:30`,
+        showDateTimeCode: `${isoToDateCode(date)}0000`,
+        showTimeLabel: "Venue",
+        cutoffAt: "",
+        cutoffCode: "",
+        format: parsedMovie.format,
+        language: parsedMovie.language,
+        title: parsedMovie.title,
+        releaseLabel: parsedMovie.title,
+        screenName: venue.theatreShortName,
+        totalSeats: chainTotalSeats,
+        availableSeats: Math.max(chainTotalSeats - chainSoldSeats, 0),
+        soldSeats: chainSoldSeats,
+        gross: number(chainRow.gross),
+        occupancyPercent: chainTotalSeats
+          ? Number(((chainSoldSeats / chainTotalSeats) * 100).toFixed(2))
+          : number(chainRow.occupancy),
+        ff: number(chainRow.fastfilling),
+        hf: number(chainRow.housefull),
+        boxofficeShowCount: number(chainRow.shows),
+        boxofficeVenueCount: number(chainRow.venues),
+        boxofficeSource: {
+          method: "bfilmy-chain-summary",
+          capturedAt: generatedAt,
+          lastUpdated: payload.last_updated || "",
+          chain: chainRow.chain
+        }
+      });
+    }
   }
 
   if (!captures.length) return null;
@@ -213,8 +301,10 @@ function buildBfilmyCityFallback({ date, payload, generatedAt }) {
     lastUpdated: payload.last_updated || "",
     generatedAt,
     summary,
+    theatres: summarizeByTheatre(venueCaptures),
     movies: summarizeByMovie(captures),
     captures,
+    venueCaptures,
     city: CITY
   };
 }
@@ -376,7 +466,7 @@ function buildOutput({ date, existing, captures, plannedShows, errors, generated
     city: CITY,
     capturePolicy: CAPTURE_POLICY,
     summary: shouldUseBfilmyFallback ? bfilmyFallback.summary : summarize(sortedCaptures),
-    theatres: summarizeByTheatre(sortedCaptures),
+    theatres: shouldUseBfilmyFallback ? bfilmyFallback.theatres : summarizeByTheatre(sortedCaptures),
     movies: shouldUseBfilmyFallback ? bfilmyFallback.movies : summarizeByMovie(sortedCaptures),
     captures: sortedCaptures,
     plannedShows: [...plannedShows].sort(compareShows),
@@ -393,7 +483,8 @@ function buildOutput({ date, existing, captures, plannedShows, errors, generated
             totalGross: bfilmyFallback.summary.totalGross,
             totalSold: bfilmyFallback.summary.totalSold,
             totalShows: bfilmyFallback.summary.totalShows,
-            movies: bfilmyFallback.movies.length
+            movies: bfilmyFallback.movies.length,
+            theatreRows: bfilmyFallback.theatres.length
           }
         : null
     }
