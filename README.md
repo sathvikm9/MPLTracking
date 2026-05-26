@@ -81,3 +81,25 @@ After deploy, copy the Worker URL and set it in `public/runtime-config.json`:
 Then redeploy the GitHub Pages frontend. Once that URL is configured, normal page refreshes will hit the live proxy and pull current numbers instead of only the last published JSON snapshot.
 
 If Cloudflare auth is not set up yet, there is also a Vercel-compatible proxy in `proxy-vercel/api/live.js`. Deploy that folder and point `public/runtime-config.json` at the deployed URL in the same way.
+
+### BMS upstream recovery
+
+BookMyShow can block server-side/headless theatre scraping with Cloudflare. The Vercel proxy supports configurable showtime upstreams so a working source can be swapped in without code changes:
+
+```bash
+BMS_SHOWTIME_API_BASE_URLS="https://your-working-source.example/api/showtimes"
+BMS_SHOWTIME_API_EXTRA_BASE_URLS="https://fallback-one.example/api/showtimes,https://fallback-two.example/api/showtimes"
+BMS_SHOWTIME_API_COOKIE="cookie=value; another=value"
+BMS_SHOWTIME_API_USER_AGENT="Mozilla/5.0 ..."
+BMS_SHOWTIME_API_ORIGIN="https://example.com"
+BMS_SHOWTIME_API_REFERER="https://example.com/"
+BMS_SHOWTIME_API_HEADERS_JSON='{"x-custom-header":"value"}'
+```
+
+Check source status with:
+
+```bash
+curl "https://proxy-vercel-green.vercel.app/api/source-health?date=2026-05-26&eventCode=ET00455003&venueCode=RTDM"
+```
+
+If BMS showtime sources are blocked, boxoffice falls back to the BFilmy Madanapalle city/movie aggregate feed. That keeps live totals available, but theatre-level BMS rows need a healthy show-level upstream.

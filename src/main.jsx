@@ -1285,6 +1285,20 @@ function Notes({ notes }) {
   );
 }
 
+function boxofficeNotes(data, usingBfilmyFallback) {
+  const errors = data?.meta?.errors || [];
+  if (!usingBfilmyFallback) return errors;
+
+  const extraErrors = errors.filter(
+    (note) => !/BookMyShow theatre-page|Cloudflare|live mirror fallback|Live mirror fallback/i.test(note)
+  );
+
+  return [
+    "BMS theatre-level capture is currently unavailable, so city and movie totals are shown from the BFilmy live aggregate feed.",
+    ...extraErrors
+  ];
+}
+
 function MovieWiseBoard({ shows, emptyMessage }) {
   const groups = buildMovieWiseGroups(shows);
 
@@ -1609,7 +1623,7 @@ function BoxofficeScreen({ screenSwitcher }) {
         />
       </Section>
 
-      <Notes notes={data?.meta?.errors || []} />
+      <Notes notes={boxofficeNotes(data, usingBfilmyFallback)} />
     </main>
   );
 }

@@ -1,5 +1,5 @@
 const MADANAPALLE_REGION_CODE = "MDNP";
-const SHOWTIME_API_BASE_URLS = [
+const DEFAULT_SHOWTIME_API_BASE_URLS = [
   "https://bms-india4.vercel.app/api/showtimes",
   "https://bms-india2.vercel.app/api/showtimes",
   "https://bms-india3.vercel.app/api/showtimes"
@@ -25,6 +25,56 @@ globalThis.__MADANAPALLE_LAST_GOOD_SHOWTIME_PAYLOADS__ = lastGoodPayloadCache;
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function listFromEnv(value) {
+  return String(value || "")
+    .split(/[,\n]/)
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+}
+
+function configuredShowtimeApiBaseUrls() {
+  const primary = listFromEnv(process.env.BMS_SHOWTIME_API_BASE_URLS);
+  const extra = listFromEnv(process.env.BMS_SHOWTIME_API_EXTRA_BASE_URLS);
+  return [...new Set([...primary, ...DEFAULT_SHOWTIME_API_BASE_URLS, ...extra])];
+}
+
+function configuredShowtimeApiHeaders() {
+  const headers = { ...SHOWTIME_API_HEADERS };
+
+  if (process.env.BMS_SHOWTIME_API_ORIGIN) headers.origin = process.env.BMS_SHOWTIME_API_ORIGIN;
+  if (process.env.BMS_SHOWTIME_API_REFERER) headers.referer = process.env.BMS_SHOWTIME_API_REFERER;
+  if (process.env.BMS_SHOWTIME_API_USER_AGENT) {
+    headers["user-agent"] = process.env.BMS_SHOWTIME_API_USER_AGENT;
+  }
+  if (process.env.BMS_SHOWTIME_API_COOKIE) headers.cookie = process.env.BMS_SHOWTIME_API_COOKIE;
+
+  if (process.env.BMS_SHOWTIME_API_HEADERS_JSON) {
+    try {
+      const parsed = JSON.parse(process.env.BMS_SHOWTIME_API_HEADERS_JSON);
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        for (const [key, value] of Object.entries(parsed)) {
+          if (value !== undefined && value !== null && value !== "") {
+            headers[key.toLowerCase()] = String(value);
+          }
+        }
+      }
+    } catch {
+      headers["x-mpltracking-header-config-error"] = "BMS_SHOWTIME_API_HEADERS_JSON";
+    }
+  }
+
+  return headers;
+}
+
+function buildShowtimeApiUrl(baseUrl, { eventCode, dateCode }) {
+  const url = new URL(baseUrl);
+  url.searchParams.set("eventCode", eventCode);
+  url.searchParams.set("regionCode", MADANAPALLE_REGION_CODE);
+  url.searchParams.set("dateCode", dateCode);
+  url.searchParams.set("_", `${Date.now()}`);
+  return url;
 }
 
 export function normalizeDateCode(date) {
@@ -182,19 +232,19 @@ export async function fetchMadanapalleShowtimesPayload({
   const totalRetryRounds = Math.max(Number(retryRounds || 1), 1);
 
   for (let round = 0; round < totalRetryRounds; round += 1) {
-    for (const baseUrl of SHOWTIME_API_BASE_URLS) {
+    for (const baseUrl of configuredShowtimeApiBaseUrls()) {
       const startedAt = Date.now();
 
       try {
-        const url = new URL(baseUrl);
-        url.searchParams.set("eventCode", normalizedEventCode);
-        url.searchParams.set("regionCode", MADANAPALLE_REGION_CODE);
-        url.searchParams.set("dateCode", normalizedDateCode);
+        const url = buildShowtimeApiUrl(baseUrl, {
+          eventCode: normalizedEventCode,
+          dateCode: normalizedDateCode
+        });
         url.searchParams.set("_", `${Date.now()}-${round}`);
 
         const response = await fetchImpl(url, {
           cache: "no-store",
-          headers: SHOWTIME_API_HEADERS,
+          headers: configuredShowtimeApiHeaders(),
           signal:
             typeof AbortSignal !== "undefined" && typeof AbortSignal.timeout === "function"
               ? AbortSignal.timeout(SHOWTIME_API_TIMEOUT_MS)
@@ -285,6 +335,95 @@ export async function fetchMadanapalleShowtimesPayload({
   error.status = error.status || 502;
   error.attempts = attempts;
   throw error;
+}
+
+export async function checkMadanapalleShowtimesSources({
+  eventCode,
+  date,
+  dateCode,
+  venueCode = "",
+  fetchImpl = fetch
+}) {
+  const normalizedEventCode = String(eventCode || "").trim().toUpperCase();
+  const normalizedDateCode = normalizeDateCode(dateCode || date);
+
+  assertValidMirrorParams({
+    eventCode: normalizedEventCode,
+    dateCode: normalizedDateCode
+  });
+
+  const sources = configuredShowtimeApiBaseUrls();
+  const headers = configuredShowtimeApiHeaders();
+  const checks = await Promise.all(
+    sources.map(async (baseUrl) => {
+      const startedAt = Date.now();
+      const url = buildShowtimeApiUrl(baseUrl, {
+        eventCode: normalizedEventCode,
+        dateCode: normalizedDateCode
+      });
+
+      try {
+        const response = await fetchImpl(url, {
+          cache: "no-store",
+          headers,
+          signal:
+            typeof AbortSignal !== "undefined" && typeof AbortSignal.timeout === "function"
+              ? AbortSignal.timeout(SHOWTIME_API_TIMEOUT_MS)
+              : undefined
+        });
+        const text = await response.text();
+        let payload = null;
+        let parseError = "";
+
+        try {
+          payload = JSON.parse(text);
+        } catch (error) {
+          parseError = error.message;
+        }
+
+        const filteredPayload = payload
+          ? filterPayload(payload, { venueCode, dateCode: normalizedDateCode })
+          : null;
+        const summary = filteredPayload ? summarizePayload(filteredPayload) : null;
+        const cloudflareBlocked = /Attention Required|Cloudflare|cf-error|blocked/i.test(text);
+
+        return {
+          upstream: baseUrl,
+          ok: Boolean(response.ok && Array.isArray(payload?.ShowDetails) && summary?.showCount > 0),
+          status: response.status,
+          durationMs: Date.now() - startedAt,
+          cloudflareBlocked,
+          parseError,
+          summary,
+          preview: response.ok && payload ? "" : text.slice(0, 180)
+        };
+      } catch (error) {
+        return {
+          upstream: baseUrl,
+          ok: false,
+          status: 0,
+          durationMs: Date.now() - startedAt,
+          cloudflareBlocked: false,
+          error: error.message
+        };
+      }
+    })
+  );
+
+  return {
+    ok: checks.some((check) => check.ok),
+    regionCode: MADANAPALLE_REGION_CODE,
+    eventCode: normalizedEventCode,
+    dateCode: normalizedDateCode,
+    venueCode,
+    configured: {
+      sources: sources.length,
+      hasCookie: Boolean(headers.cookie),
+      hasCustomHeaders: Boolean(process.env.BMS_SHOWTIME_API_HEADERS_JSON),
+      hasCustomUserAgent: Boolean(process.env.BMS_SHOWTIME_API_USER_AGENT)
+    },
+    checks
+  };
 }
 
 export async function buildMadanapalleShowtimesMirror({ requestUrl, fetchImpl = fetch }) {

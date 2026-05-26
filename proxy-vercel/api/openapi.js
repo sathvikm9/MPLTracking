@@ -58,6 +58,54 @@ function buildOpenApiSpec(req) {
           }
         }
       },
+      "/api/source-health": {
+        get: {
+          tags: ["Health"],
+          summary: "Check upstream data source health",
+          description:
+            "Checks configured BMS showtime upstreams and the BFilmy Madanapalle aggregate feed for a selected event/date/theatre. Use this before relying on theatre-level BMS boxoffice rows.",
+          parameters: [
+            {
+              name: "date",
+              in: "query",
+              required: false,
+              description: "Date in YYYY-MM-DD format. Defaults to current India date.",
+              schema: {
+                type: "string",
+                format: "date"
+              },
+              example: "2026-05-26"
+            },
+            {
+              name: "eventCode",
+              in: "query",
+              required: false,
+              description: "BookMyShow event code to test against configured BMS showtime sources.",
+              schema: {
+                type: "string",
+                pattern: "^ET\\d+$"
+              },
+              example: "ET00455003"
+            },
+            {
+              name: "venueCode",
+              in: "query",
+              required: false,
+              description: "Venue code to filter BMS showtime health checks.",
+              schema: {
+                type: "string",
+                enum: ["RTDM", "ASRM", "MSDR", "SKMD"]
+              },
+              example: "RTDM"
+            }
+          ],
+          responses: {
+            200: {
+              description: "Source health report"
+            }
+          }
+        }
+      },
       "/api/live-dates": {
         get: {
           tags: ["Live tracking"],
