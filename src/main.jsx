@@ -1384,6 +1384,9 @@ function BoxofficeScreen({ screenSwitcher }) {
   const summary = data?.summary || buildSummaryFromShows([]);
   const theatres = data?.theatres || [];
   const movies = data?.movies || [];
+  const bfilmyFallback = data?.meta?.bfilmyFallback;
+  const usingBfilmyFallback = Boolean(bfilmyFallback?.used);
+  const hasBoxofficeSummary = captures.length || number(summary.totalShows) > 0;
   const emptyMessage =
     error?.status === 404
       ? `No boxoffice captures yet for ${formatSelectedDateLabel(selectedDate)}.`
@@ -1424,7 +1427,9 @@ function BoxofficeScreen({ screenSwitcher }) {
                 ? "Loading boxoffice captures..."
                 : error
                   ? emptyMessage
-                  : `${number(captures.length)} cut-off show captures loaded.`}
+                  : usingBfilmyFallback
+                    ? `BFilmy live city summary loaded with ${number(summary.totalShows)} shows.`
+                    : `${number(captures.length)} cut-off show captures loaded.`}
             </span>
           </div>
 
@@ -1448,13 +1453,19 @@ function BoxofficeScreen({ screenSwitcher }) {
           </div>
           <div className="meta-pill">
             <span>Captured Shows</span>
-            <strong>{number(captures.length)}</strong>
-            <small>{plannedShows.length ? `${number(plannedShows.length)} currently visible/planned` : "No planned rows"}</small>
+            <strong>{number(usingBfilmyFallback ? summary.totalShows : captures.length)}</strong>
+            <small>
+              {usingBfilmyFallback
+                ? "BFilmy city aggregate"
+                : plannedShows.length
+                  ? `${number(plannedShows.length)} currently visible/planned`
+                  : "No planned rows"}
+            </small>
           </div>
           <div className="meta-pill">
             <span>Status</span>
             <strong>{data?.meta?.status || (error ? "not ready" : "loading")}</strong>
-            <small>Fresh only when scheduled capture succeeds</small>
+            <small>{usingBfilmyFallback ? "Live aggregate fallback" : "Fresh only when scheduled capture succeeds"}</small>
           </div>
         </div>
       </section>
@@ -1463,7 +1474,7 @@ function BoxofficeScreen({ screenSwitcher }) {
         <StatCard
           eyebrow="Gross"
           value={currency(summary.totalGross)}
-          caption={`${number(summary.totalShows)} captured shows`}
+          caption={`${number(summary.totalShows)} ${usingBfilmyFallback ? "BFilmy shows" : "captured shows"}`}
           tone="ink"
         />
         <StatCard
@@ -1481,14 +1492,22 @@ function BoxofficeScreen({ screenSwitcher }) {
         <StatCard
           eyebrow="Movies"
           value={number(movies.length)}
-          caption={`${number(theatres.length)} theatres captured`}
+          caption={
+            usingBfilmyFallback
+              ? `${number(bfilmyFallback?.movies || movies.length)} movies from BFilmy`
+              : `${number(theatres.length)} theatres captured`
+          }
         />
       </section>
 
       <Section
         title="City Summary"
         kicker="Madanapalle day total"
-        aside={<span className="section__hint">{number(captures.length)} captures</span>}
+        aside={
+          <span className="section__hint">
+            {usingBfilmyFallback ? "BFilmy city feed" : `${number(captures.length)} captures`}
+          </span>
+        }
       >
         <Table
           columns={[
@@ -1502,7 +1521,7 @@ function BoxofficeScreen({ screenSwitcher }) {
             { key: "occ", label: "Occ", render: (row) => percent(row.occ) }
           ]}
           rows={
-            captures.length
+            hasBoxofficeSummary
               ? [
                   {
                     id: "madanapalle",

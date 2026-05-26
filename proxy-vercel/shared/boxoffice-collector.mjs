@@ -3,6 +3,7 @@ import { SAI_CHITRA_THEATRE } from "./ticketnew-live.mjs";
 import { readBoxofficeSnapshot, writeBoxofficeSnapshot } from "./upstash-boxoffice.mjs";
 
 const INDIA_TIMEZONE = "Asia/Kolkata";
+const BFILMY_DAILY_DATA_BASE_URL = "https://bfilmyapi.pages.dev/daily/data";
 const ACTIVE_THEATRES = new Set(["RTDM", "MSDR", "ASRM", "SKMD", "SAIC"]);
 const CITY = {
   name: "Madanapalle",
@@ -109,7 +110,7 @@ function compareShows(left, right) {
 }
 
 function summarize(shows) {
-  const totalShows = shows.length;
+  const totalShows = shows.reduce((sum, show) => sum + number(show.boxofficeShowCount || 1), 0);
   const totalCapacity = shows.reduce((sum, show) => sum + number(show.totalSeats), 0);
   const totalAvailable = shows.reduce((sum, show) => sum + number(show.availableSeats), 0);
   const totalSold = shows.reduce((sum, show) => sum + number(show.soldSeats), 0);
@@ -125,6 +126,121 @@ function summarize(shows) {
     ff: 0,
     hf: 0
   };
+}
+
+function parseBfilmyMovieKey(movieKey) {
+  const value = String(movieKey || "").trim();
+  const match = value.match(/^(.*?)\s*\[([^|\]]+)\|\s*([^\]]+)\]\s*$/);
+  if (!match) {
+    return {
+      title: value || "Unknown Movie",
+      format: "",
+      language: ""
+    };
+  }
+
+  return {
+    title: match[1].trim() || "Unknown Movie",
+    format: match[2].trim(),
+    language: match[3].trim()
+  };
+}
+
+function buildBfilmyCityFallback({ date, payload, generatedAt }) {
+  const captures = [];
+  const moviesPayload = payload?.movies && typeof payload.movies === "object" ? payload.movies : {};
+
+  for (const [movieKey, movie] of Object.entries(moviesPayload)) {
+    const cityRow = (movie?.details || []).find(
+      (entry) => String(entry?.city || "").toLowerCase() === "madanapalle"
+    );
+    if (!cityRow) continue;
+
+    const parsedMovie = parseBfilmyMovieKey(movieKey);
+    const totalSeats = number(cityRow.totalSeats);
+    const soldSeats = number(cityRow.sold);
+    const gross = number(cityRow.gross);
+    const showCount = number(cityRow.shows);
+    const venueCount = number(cityRow.venues);
+
+    captures.push({
+      id: `BFILMY-${date}-${movieKey}`,
+      key: `BFILMY::${date}::${movieKey}`,
+      eventCode: "",
+      sessionId: "",
+      platform: "bfilmy",
+      venueCode: "BFILMY",
+      venueName: "BFilmy Madanapalle City Feed",
+      theatreShortName: "City Feed",
+      citySlug: CITY.slug,
+      showDate: date,
+      showDateCode: isoToDateCode(date),
+      showDateTime: `${date}T00:00:00+05:30`,
+      showDateTimeCode: `${isoToDateCode(date)}0000`,
+      showTimeLabel: "City",
+      cutoffAt: "",
+      cutoffCode: "",
+      format: parsedMovie.format,
+      language: parsedMovie.language,
+      title: parsedMovie.title,
+      releaseLabel: parsedMovie.title,
+      screenName: "Madanapalle",
+      totalSeats,
+      availableSeats: Math.max(totalSeats - soldSeats, 0),
+      soldSeats,
+      gross,
+      occupancyPercent: totalSeats ? Number(((soldSeats / totalSeats) * 100).toFixed(2)) : number(cityRow.occupancy),
+      ff: number(cityRow.fastfilling),
+      hf: number(cityRow.housefull),
+      boxofficeShowCount: showCount,
+      boxofficeVenueCount: venueCount,
+      boxofficeSource: {
+        method: "bfilmy-city-summary",
+        capturedAt: generatedAt,
+        lastUpdated: payload.last_updated || ""
+      }
+    });
+  }
+
+  if (!captures.length) return null;
+
+  const summary = summarize(captures);
+  summary.ff = captures.reduce((sum, show) => sum + number(show.ff), 0);
+  summary.hf = captures.reduce((sum, show) => sum + number(show.hf), 0);
+
+  return {
+    source: "bfilmy-daily-city-summary",
+    lastUpdated: payload.last_updated || "",
+    generatedAt,
+    summary,
+    movies: summarizeByMovie(captures),
+    captures,
+    city: CITY
+  };
+}
+
+async function fetchBfilmyCityFallback({ date, fetchImpl = fetch, generatedAt }) {
+  const url = `${BFILMY_DAILY_DATA_BASE_URL}/${isoToDateCode(date)}/finalsummary.json?ts=${Date.now()}`;
+  const response = await fetchImpl(url, {
+    cache: "no-store",
+    headers: {
+      accept: "application/json, text/plain, */*",
+      referer: "https://bfilmy.pages.dev/Live%20Boxoffice/",
+      "user-agent":
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36"
+    }
+  });
+  const text = await response.text();
+
+  if (!response.ok) {
+    throw new Error(`BFilmy city summary failed: ${response.status} ${text.slice(0, 120)}`);
+  }
+
+  return buildBfilmyCityFallback({
+    date,
+    payload: JSON.parse(text),
+    generatedAt
+  });
 }
 
 function summarizeByTheatre(shows) {
@@ -246,8 +362,9 @@ async function fetchLiveTheatreSnapshot({ liveApiBase, date, venueCode, fetchImp
   return data;
 }
 
-function buildOutput({ date, existing, captures, plannedShows, errors, generatedAt }) {
+function buildOutput({ date, existing, captures, plannedShows, errors, generatedAt, bfilmyFallback }) {
   const sortedCaptures = [...captures].sort(compareShows);
+  const shouldUseBfilmyFallback = Boolean(bfilmyFallback && errors.length);
 
   return {
     version: 1,
@@ -258,18 +375,51 @@ function buildOutput({ date, existing, captures, plannedShows, errors, generated
     timezone: INDIA_TIMEZONE,
     city: CITY,
     capturePolicy: CAPTURE_POLICY,
-    summary: summarize(sortedCaptures),
+    summary: shouldUseBfilmyFallback ? bfilmyFallback.summary : summarize(sortedCaptures),
     theatres: summarizeByTheatre(sortedCaptures),
-    movies: summarizeByMovie(sortedCaptures),
+    movies: shouldUseBfilmyFallback ? bfilmyFallback.movies : summarizeByMovie(sortedCaptures),
     captures: sortedCaptures,
     plannedShows: [...plannedShows].sort(compareShows),
     meta: {
-      status: errors.length ? "partial" : "ok",
-      source: "vercel-scheduled-boxoffice",
+      status: errors.length ? (shouldUseBfilmyFallback ? "fallback" : "partial") : "ok",
+      source: shouldUseBfilmyFallback ? "bfilmy-daily-city-summary" : "vercel-scheduled-boxoffice",
       previousGeneratedAt: existing?.generatedAt || null,
-      errors
+      errors,
+      bfilmyFallback: bfilmyFallback
+        ? {
+            used: shouldUseBfilmyFallback,
+            source: bfilmyFallback.source,
+            lastUpdated: bfilmyFallback.lastUpdated,
+            totalGross: bfilmyFallback.summary.totalGross,
+            totalSold: bfilmyFallback.summary.totalSold,
+            totalShows: bfilmyFallback.summary.totalShows,
+            movies: bfilmyFallback.movies.length
+          }
+        : null
     }
   };
+}
+
+export async function applyBfilmyCityFallback(snapshot, { fetchImpl = fetch, generatedAt = new Date().toISOString() } = {}) {
+  const errors = snapshot?.meta?.errors || [];
+  if (!snapshot || !errors.length || snapshot.meta?.bfilmyFallback?.used) return snapshot;
+
+  const bfilmyFallback = await fetchBfilmyCityFallback({
+    date: snapshot.targetDate,
+    fetchImpl,
+    generatedAt
+  });
+  if (!bfilmyFallback) return snapshot;
+
+  return buildOutput({
+    date: snapshot.targetDate,
+    existing: snapshot,
+    captures: snapshot.captures || [],
+    plannedShows: snapshot.plannedShows || [],
+    errors,
+    generatedAt,
+    bfilmyFallback
+  });
 }
 
 export async function collectBoxofficeSnapshot({
@@ -326,13 +476,23 @@ export async function collectBoxofficeSnapshot({
     })
   );
 
+  let bfilmyFallback = null;
+  if (errors.length) {
+    try {
+      bfilmyFallback = await fetchBfilmyCityFallback({ date, fetchImpl, generatedAt });
+    } catch (error) {
+      errors.push(`BFilmy city summary: ${error.message}`);
+    }
+  }
+
   const data = buildOutput({
     date,
     existing,
     captures: Array.from(capturesByKey.values()),
     plannedShows: Array.from(plannedByKey.values()),
     errors,
-    generatedAt
+    generatedAt,
+    bfilmyFallback
   });
 
   return writeBoxofficeSnapshot(data);

@@ -1,4 +1,5 @@
 import { readBoxofficeSnapshot } from "../shared/upstash-boxoffice.mjs";
+import { applyBfilmyCityFallback } from "../shared/boxoffice-collector.mjs";
 
 function applyCors(res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -31,10 +32,12 @@ export default async function handler(req, res) {
       return;
     }
 
+    const output = await applyBfilmyCityFallback(data, { fetchImpl: fetch });
+
     res.status(200).json({
-      ...data,
+      ...output,
       meta: {
-        ...(data.meta || {}),
+        ...(output.meta || {}),
         clientSource: "upstash-redis"
       }
     });
