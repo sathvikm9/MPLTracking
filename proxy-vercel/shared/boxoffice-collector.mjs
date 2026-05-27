@@ -208,6 +208,26 @@ function applyManualPlanOverride({ plannedByKey, date, theatres, notes }) {
   if (override.note) notes.push(override.note);
 }
 
+function refreshPlannedCapturePolicies({ plannedByKey, theatres }) {
+  const theatreByCode = new Map(theatres.map((theatre) => [theatre.venueCode, theatre]));
+
+  for (const [key, show] of plannedByKey.entries()) {
+    if (!show.showDateTime) continue;
+    const theatre = theatreByCode.get(show.venueCode);
+    const policy = CAPTURE_POLICY[show.venueCode] || {
+      fallbackCaptureAfterMinutes: theatre?.fallbackCutoffMinutes || 15,
+      captureBeforeCutoffMinutes: 1,
+      note: "Fallback theatre capture policy."
+    };
+
+    plannedByKey.set(key, {
+      ...show,
+      captureAt: resolveCaptureAt(show, policy),
+      capturePolicy: policy
+    });
+  }
+}
+
 function resolveCaptureAt(show, policy) {
   if (Number.isFinite(Number(policy.captureAfterShowMinutes))) {
     return addMinutesToIso(show.showDateTime, number(policy.captureAfterShowMinutes));
@@ -725,6 +745,10 @@ export async function collectBoxofficeSnapshot({
     date,
     theatres,
     notes: errors
+  });
+  refreshPlannedCapturePolicies({
+    plannedByKey,
+    theatres
   });
 
   let bfilmyFallback = null;
