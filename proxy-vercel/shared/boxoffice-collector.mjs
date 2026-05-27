@@ -43,12 +43,17 @@ const CAPTURE_POLICY = {
   }
 };
 
-const EXPECTED_SHOW_SLOTS = {
-  RTDM: ["11:00 AM", "02:15 PM", "06:00 PM", "09:15 PM"],
-  MSDR: ["11:00 AM", "02:15 PM", "06:15 PM", "09:15 PM"],
-  ASRM: ["11:00 AM", "02:15 PM", "06:00 PM", "09:15 PM"],
-  SKMD: ["11:00 AM", "02:00 PM", "06:00 PM", "09:00 PM"],
-  SAIC: ["11:00 AM", "02:15 PM", "06:00 PM", "09:15 PM"]
+const MANUAL_PLAN_OVERRIDES = {
+  "2026-05-28": {
+    note: "Manual plan override added because BMS discovery is blocked and the known May 28 plan is 5 theatres with 4 shows each.",
+    theatres: {
+      RTDM: ["11:00 AM", "02:15 PM", "06:00 PM", "09:15 PM"],
+      MSDR: ["11:00 AM", "02:15 PM", "06:15 PM", "09:15 PM"],
+      ASRM: ["11:00 AM", "02:15 PM", "06:00 PM", "09:15 PM"],
+      SKMD: ["11:00 AM", "02:00 PM", "06:00 PM", "09:00 PM"],
+      SAIC: ["11:00 AM", "02:15 PM", "06:00 PM", "09:15 PM"]
+    }
+  }
 };
 
 function number(value) {
@@ -106,11 +111,11 @@ function timeLabelToParts(label) {
   };
 }
 
-function plannedSlotKey(venueCode, showDateTimeCode) {
-  return [venueCode || "", showDateTimeCode || "", "EXPECTED", ""].join("::");
+function manualPlanKey(venueCode, showDateTimeCode) {
+  return [venueCode || "", showDateTimeCode || "", "MANUAL-PLAN", ""].join("::");
 }
 
-function buildExpectedPlannedShow({ date, theatre, showTimeLabel, policy }) {
+function buildManualPlannedShow({ date, theatre, showTimeLabel, policy, note }) {
   const parts = timeLabelToParts(showTimeLabel);
   if (!parts) return null;
 
@@ -118,8 +123,8 @@ function buildExpectedPlannedShow({ date, theatre, showTimeLabel, policy }) {
   const showDateTimeCode = `${showDateCode}${parts.hour}${parts.minute}`;
   const showDateTime = `${date}T${parts.hour}:${parts.minute}:00+05:30`;
   const show = {
-    id: `EXPECTED-${theatre.venueCode}-${showDateTimeCode}`,
-    key: plannedSlotKey(theatre.venueCode, showDateTimeCode),
+    id: `MANUAL-PLAN-${theatre.venueCode}-${showDateTimeCode}`,
+    key: manualPlanKey(theatre.venueCode, showDateTimeCode),
     eventCode: "",
     sessionId: "",
     platform: theatre.platform || "bookmyshow",
@@ -136,8 +141,8 @@ function buildExpectedPlannedShow({ date, theatre, showTimeLabel, policy }) {
     cutoffCode: "",
     format: "",
     language: "",
-    title: "Show pending BMS discovery",
-    releaseLabel: "Show pending BMS discovery",
+    title: "Manual planned show",
+    releaseLabel: "Manual planned show",
     screenName: theatre.shortName,
     totalSeats: 0,
     availableSeats: 0,
@@ -145,8 +150,10 @@ function buildExpectedPlannedShow({ date, theatre, showTimeLabel, policy }) {
     gross: 0,
     occupancyPercent: 0,
     plannedOnly: true,
+    manualPlan: true,
     source: {
-      method: "expected-planned-slot"
+      method: "manual-plan-override",
+      note
     },
     capturePolicy: policy
   };
@@ -157,14 +164,19 @@ function buildExpectedPlannedShow({ date, theatre, showTimeLabel, policy }) {
   };
 }
 
-function ensureExpectedPlannedShows({ plannedByKey, date, theatres }) {
+function applyManualPlanOverride({ plannedByKey, date, theatres, notes }) {
+  const override = MANUAL_PLAN_OVERRIDES[date];
+  if (!override) return;
+
+  const theatreByCode = new Map(theatres.map((theatre) => [theatre.venueCode, theatre]));
   const existingSlots = new Set();
   for (const show of plannedByKey.values()) {
     existingSlots.add(`${show.venueCode || ""}::${show.showDateTimeCode || ""}`);
   }
 
-  for (const theatre of theatres) {
-    const slots = EXPECTED_SHOW_SLOTS[theatre.venueCode] || [];
+  for (const [venueCode, slots] of Object.entries(override.theatres || {})) {
+    const theatre = theatreByCode.get(venueCode);
+    if (!theatre) continue;
     const policy = CAPTURE_POLICY[theatre.venueCode] || {
       fallbackCaptureAfterMinutes: theatre.fallbackCutoffMinutes || 15,
       captureBeforeCutoffMinutes: 1,
@@ -172,7 +184,13 @@ function ensureExpectedPlannedShows({ plannedByKey, date, theatres }) {
     };
 
     for (const showTimeLabel of slots) {
-      const plannedShow = buildExpectedPlannedShow({ date, theatre, showTimeLabel, policy });
+      const plannedShow = buildManualPlannedShow({
+        date,
+        theatre,
+        showTimeLabel,
+        policy,
+        note: override.note
+      });
       if (!plannedShow) continue;
       const slotKey = `${plannedShow.venueCode}::${plannedShow.showDateTimeCode}`;
       if (existingSlots.has(slotKey)) continue;
@@ -180,6 +198,8 @@ function ensureExpectedPlannedShows({ plannedByKey, date, theatres }) {
       existingSlots.add(slotKey);
     }
   }
+
+  if (override.note) notes.push(override.note);
 }
 
 function resolveCaptureAt(show, policy) {
@@ -690,10 +710,11 @@ export async function collectBoxofficeSnapshot({
     })
   );
 
-  ensureExpectedPlannedShows({
+  applyManualPlanOverride({
     plannedByKey,
     date,
-    theatres
+    theatres,
+    notes: errors
   });
 
   let bfilmyFallback = null;
