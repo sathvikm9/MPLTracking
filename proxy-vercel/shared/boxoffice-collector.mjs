@@ -16,24 +16,28 @@ const CITY = {
 
 const CAPTURE_POLICY = {
   RTDM: {
-    fallbackCaptureAfterMinutes: 25,
-    captureBeforeCutoffMinutes: 5,
-    note: "Ravi captures about 5 minutes before the currently exposed cutoff."
+    captureAfterShowMinutes: 28,
+    fallbackCaptureAfterMinutes: 28,
+    captureBeforeCutoffMinutes: 0,
+    note: "Ravi captures 28 minutes after showtime; BMS cutoff time is ignored."
   },
   MSDR: {
-    fallbackCaptureAfterMinutes: 25,
-    captureBeforeCutoffMinutes: 5,
-    note: "Siddartha captures about 5 minutes before the currently exposed cutoff."
+    captureAfterShowMinutes: 28,
+    fallbackCaptureAfterMinutes: 28,
+    captureBeforeCutoffMinutes: 0,
+    note: "Siddartha captures 28 minutes after showtime; BMS cutoff time is ignored."
   },
   ASRM: {
-    fallbackCaptureAfterMinutes: 12,
-    captureBeforeCutoffMinutes: 3,
-    note: "ASR captures about 3 minutes before the 15-minute cutoff."
+    captureAfterShowMinutes: 14,
+    fallbackCaptureAfterMinutes: 14,
+    captureBeforeCutoffMinutes: 0,
+    note: "ASR captures 14 minutes after showtime; BMS cutoff time is ignored."
   },
   SKMD: {
-    fallbackCaptureAfterMinutes: 12,
-    captureBeforeCutoffMinutes: 3,
-    note: "Sri Krishna captures about 3 minutes before the 15-minute cutoff."
+    captureAfterShowMinutes: 14,
+    fallbackCaptureAfterMinutes: 14,
+    captureBeforeCutoffMinutes: 0,
+    note: "Sri Krishna captures 14 minutes after showtime; BMS cutoff time is ignored."
   },
   SAIC: {
     fallbackCaptureAfterMinutes: -3,
@@ -205,6 +209,10 @@ function applyManualPlanOverride({ plannedByKey, date, theatres, notes }) {
 }
 
 function resolveCaptureAt(show, policy) {
+  if (Number.isFinite(Number(policy.captureAfterShowMinutes))) {
+    return addMinutesToIso(show.showDateTime, number(policy.captureAfterShowMinutes));
+  }
+
   if (show.cutoffAt) {
     const cutoff = new Date(show.cutoffAt);
     if (Number.isFinite(cutoff.getTime())) {
