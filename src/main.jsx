@@ -1318,7 +1318,15 @@ function Notes({ notes }) {
 
 function boxofficeNotes(data, usingBfilmyFallback) {
   const errors = data?.meta?.errors || [];
-  if (!usingBfilmyFallback) return errors;
+  const isPartialCapture = data?.meta?.status === "partial" && !usingBfilmyFallback;
+  if (!usingBfilmyFallback) {
+    return isPartialCapture
+      ? [
+          "This is a partial BMS capture. Missing theatres/shows are not estimated, and the summary only totals rows that were actually captured.",
+          ...errors
+        ]
+      : errors;
+  }
 
   const extraErrors = errors.filter(
     (note) => !/BookMyShow theatre-page|Cloudflare|live mirror fallback|Live mirror fallback/i.test(note)
@@ -1434,6 +1442,15 @@ function BoxofficeScreen({ screenSwitcher }) {
   const usingBfilmyFallback = Boolean(bfilmyFallback?.used);
   const visibleCaptures = usingBfilmyFallback ? [] : captures;
   const hasBoxofficeSummary = visibleCaptures.length || number(summary.totalShows) > 0;
+  const isPartialCapture = data?.meta?.status === "partial" && !usingBfilmyFallback;
+  const plannedCount = plannedShows.length;
+  const capturedCount = visibleCaptures.length;
+  const coveragePercent =
+    plannedCount > 0 ? Number(((capturedCount / plannedCount) * 100).toFixed(0)) : null;
+  const coverageLabel =
+    plannedCount > 0
+      ? `${number(capturedCount)} of ${number(plannedCount)} planned rows`
+      : `${number(capturedCount)} captured rows`;
   const emptyMessage =
     error?.status === 404
       ? `No boxoffice captures yet for ${formatSelectedDateLabel(selectedDate)}.`
@@ -1476,6 +1493,8 @@ function BoxofficeScreen({ screenSwitcher }) {
                   ? emptyMessage
                   : usingBfilmyFallback
                     ? `BFilmy live city summary loaded with ${number(summary.totalShows)} shows.`
+                    : isPartialCapture
+                      ? `Partial BMS capture: ${coverageLabel} captured. Missing rows are not included.`
                     : `${number(visibleCaptures.length)} cut-off show captures loaded.`}
             </span>
           </div>
@@ -1505,14 +1524,20 @@ function BoxofficeScreen({ screenSwitcher }) {
               {usingBfilmyFallback
                 ? "BFilmy city aggregate"
                 : plannedShows.length
-                  ? `${number(plannedShows.length)} currently visible/planned`
+                  ? `${coverageLabel}${coveragePercent === null ? "" : ` (${coveragePercent}%)`}`
                   : "No planned rows"}
             </small>
           </div>
           <div className="meta-pill">
             <span>Status</span>
             <strong>{data?.meta?.status || (error ? "not ready" : "loading")}</strong>
-            <small>{usingBfilmyFallback ? "Live aggregate fallback" : "Fresh only when scheduled capture succeeds"}</small>
+            <small>
+              {usingBfilmyFallback
+                ? "Live aggregate fallback"
+                : isPartialCapture
+                  ? "Captured rows only"
+                  : "Fresh only when scheduled capture succeeds"}
+            </small>
           </div>
         </div>
       </section>
@@ -1521,7 +1546,9 @@ function BoxofficeScreen({ screenSwitcher }) {
         <StatCard
           eyebrow="Gross"
           value={currency(summary.totalGross)}
-          caption={`${number(summary.totalShows)} ${usingBfilmyFallback ? "BFilmy shows" : "captured shows"}`}
+          caption={`${number(summary.totalShows)} ${
+            usingBfilmyFallback ? "BFilmy shows" : isPartialCapture ? "partial captured shows" : "captured shows"
+          }`}
           tone="ink"
         />
         <StatCard
@@ -1548,11 +1575,11 @@ function BoxofficeScreen({ screenSwitcher }) {
       </section>
 
       <Section
-        title="City Summary"
-        kicker="Madanapalle day total"
+        title={isPartialCapture ? "Captured Summary" : "City Summary"}
+        kicker={isPartialCapture ? "Partial captured total" : "Madanapalle day total"}
         aside={
           <span className="section__hint">
-            {usingBfilmyFallback ? "BFilmy city feed" : `${number(captures.length)} captures`}
+            {usingBfilmyFallback ? "BFilmy city feed" : isPartialCapture ? coverageLabel : `${number(captures.length)} captures`}
           </span>
         }
       >
