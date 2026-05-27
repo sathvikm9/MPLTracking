@@ -43,6 +43,14 @@ const CAPTURE_POLICY = {
   }
 };
 
+const EXPECTED_SHOW_SLOTS = {
+  RTDM: ["11:00 AM", "02:15 PM", "06:00 PM", "09:15 PM"],
+  MSDR: ["11:00 AM", "02:15 PM", "06:15 PM", "09:15 PM"],
+  ASRM: ["11:00 AM", "02:15 PM", "06:00 PM", "09:15 PM"],
+  SKMD: ["11:00 AM", "02:00 PM", "06:00 PM", "09:00 PM"],
+  SAIC: ["11:00 AM", "02:15 PM", "06:00 PM", "09:15 PM"]
+};
+
 function number(value) {
   const parsed = Number(value || 0);
   return Number.isFinite(parsed) ? parsed : 0;
@@ -80,6 +88,98 @@ function addMinutesToIso(iso, minutes) {
   const date = new Date(iso);
   date.setMinutes(date.getMinutes() + minutes);
   return date.toISOString();
+}
+
+function timeLabelToParts(label) {
+  const match = String(label || "").trim().match(/^(\d{1,2}):(\d{2})\s*([AP]M)$/i);
+  if (!match) return null;
+
+  let hour = Number(match[1]);
+  const minute = Number(match[2]);
+  const meridiem = match[3].toUpperCase();
+  if (meridiem === "PM" && hour !== 12) hour += 12;
+  if (meridiem === "AM" && hour === 12) hour = 0;
+
+  return {
+    hour: String(hour).padStart(2, "0"),
+    minute: String(minute).padStart(2, "0")
+  };
+}
+
+function plannedSlotKey(venueCode, showDateTimeCode) {
+  return [venueCode || "", showDateTimeCode || "", "EXPECTED", ""].join("::");
+}
+
+function buildExpectedPlannedShow({ date, theatre, showTimeLabel, policy }) {
+  const parts = timeLabelToParts(showTimeLabel);
+  if (!parts) return null;
+
+  const showDateCode = isoToDateCode(date);
+  const showDateTimeCode = `${showDateCode}${parts.hour}${parts.minute}`;
+  const showDateTime = `${date}T${parts.hour}:${parts.minute}:00+05:30`;
+  const show = {
+    id: `EXPECTED-${theatre.venueCode}-${showDateTimeCode}`,
+    key: plannedSlotKey(theatre.venueCode, showDateTimeCode),
+    eventCode: "",
+    sessionId: "",
+    platform: theatre.platform || "bookmyshow",
+    venueCode: theatre.venueCode,
+    venueName: theatre.name,
+    theatreShortName: theatre.shortName,
+    citySlug: CITY.slug,
+    showDate: date,
+    showDateCode,
+    showDateTime,
+    showDateTimeCode,
+    showTimeLabel,
+    cutoffAt: "",
+    cutoffCode: "",
+    format: "",
+    language: "",
+    title: "Show pending BMS discovery",
+    releaseLabel: "Show pending BMS discovery",
+    screenName: theatre.shortName,
+    totalSeats: 0,
+    availableSeats: 0,
+    soldSeats: 0,
+    gross: 0,
+    occupancyPercent: 0,
+    plannedOnly: true,
+    source: {
+      method: "expected-planned-slot"
+    },
+    capturePolicy: policy
+  };
+
+  return {
+    ...show,
+    captureAt: resolveCaptureAt(show, policy)
+  };
+}
+
+function ensureExpectedPlannedShows({ plannedByKey, date, theatres }) {
+  const existingSlots = new Set();
+  for (const show of plannedByKey.values()) {
+    existingSlots.add(`${show.venueCode || ""}::${show.showDateTimeCode || ""}`);
+  }
+
+  for (const theatre of theatres) {
+    const slots = EXPECTED_SHOW_SLOTS[theatre.venueCode] || [];
+    const policy = CAPTURE_POLICY[theatre.venueCode] || {
+      fallbackCaptureAfterMinutes: theatre.fallbackCutoffMinutes || 15,
+      captureBeforeCutoffMinutes: 1,
+      note: "Fallback theatre capture policy."
+    };
+
+    for (const showTimeLabel of slots) {
+      const plannedShow = buildExpectedPlannedShow({ date, theatre, showTimeLabel, policy });
+      if (!plannedShow) continue;
+      const slotKey = `${plannedShow.venueCode}::${plannedShow.showDateTimeCode}`;
+      if (existingSlots.has(slotKey)) continue;
+      plannedByKey.set(plannedShow.key, plannedShow);
+      existingSlots.add(slotKey);
+    }
+  }
 }
 
 function resolveCaptureAt(show, policy) {
@@ -589,6 +689,12 @@ export async function collectBoxofficeSnapshot({
       }
     })
   );
+
+  ensureExpectedPlannedShows({
+    plannedByKey,
+    date,
+    theatres
+  });
 
   let bfilmyFallback = null;
   if (errors.length) {
