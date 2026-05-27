@@ -169,9 +169,9 @@ function applyManualPlanOverride({ plannedByKey, date, theatres, notes }) {
   if (!override) return;
 
   const theatreByCode = new Map(theatres.map((theatre) => [theatre.venueCode, theatre]));
-  const existingSlots = new Set();
-  for (const show of plannedByKey.values()) {
-    existingSlots.add(`${show.venueCode || ""}::${show.showDateTimeCode || ""}`);
+  const existingSlots = new Map();
+  for (const [key, show] of plannedByKey.entries()) {
+    existingSlots.set(`${show.venueCode || ""}::${show.showDateTimeCode || ""}`, { key, show });
   }
 
   for (const [venueCode, slots] of Object.entries(override.theatres || {})) {
@@ -193,9 +193,11 @@ function applyManualPlanOverride({ plannedByKey, date, theatres, notes }) {
       });
       if (!plannedShow) continue;
       const slotKey = `${plannedShow.venueCode}::${plannedShow.showDateTimeCode}`;
-      if (existingSlots.has(slotKey)) continue;
+      const existing = existingSlots.get(slotKey);
+      if (existing && !existing.show.plannedOnly) continue;
+      if (existing) plannedByKey.delete(existing.key);
       plannedByKey.set(plannedShow.key, plannedShow);
-      existingSlots.add(slotKey);
+      existingSlots.set(slotKey, { key: plannedShow.key, show: plannedShow });
     }
   }
 
