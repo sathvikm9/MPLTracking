@@ -3,7 +3,6 @@ import { SAI_CHITRA_THEATRE } from "./ticketnew-live.mjs";
 import { readBoxofficeSnapshot, writeBoxofficeSnapshot } from "./upstash-boxoffice.mjs";
 
 const INDIA_TIMEZONE = "Asia/Kolkata";
-const BFILMY_DAILY_DATA_BASE_URL = "https://bfilmyapi.pages.dev/daily/data";
 const ACTIVE_THEATRES = new Set(["RTDM", "MSDR", "ASRM", "SKMD", "SAIC"]);
 const CITY = {
   name: "Madanapalle",
@@ -16,57 +15,30 @@ const CITY = {
 
 const CAPTURE_POLICY = {
   RTDM: {
-    captureAfterShowMinutes: 28,
-    fallbackCaptureAfterMinutes: 28,
-    captureBeforeCutoffMinutes: 0,
-    note: "Ravi captures 28 minutes after showtime; BMS cutoff time is ignored."
+    fallbackCaptureAfterMinutes: 25,
+    captureBeforeCutoffMinutes: 5,
+    note: "Ravi captures about 5 minutes before the currently exposed cutoff."
   },
   MSDR: {
-    captureAfterShowMinutes: 28,
-    fallbackCaptureAfterMinutes: 28,
-    captureBeforeCutoffMinutes: 0,
-    note: "Siddartha captures 28 minutes after showtime; BMS cutoff time is ignored."
+    fallbackCaptureAfterMinutes: 25,
+    captureBeforeCutoffMinutes: 5,
+    note: "Siddartha captures about 5 minutes before the currently exposed cutoff."
   },
   ASRM: {
-    captureAfterShowMinutes: 14,
-    fallbackCaptureAfterMinutes: 14,
-    captureBeforeCutoffMinutes: 0,
-    note: "ASR captures 14 minutes after showtime; BMS cutoff time is ignored."
+    fallbackCaptureAfterMinutes: 12,
+    captureBeforeCutoffMinutes: 3,
+    note: "ASR captures about 3 minutes before the 15-minute cutoff."
   },
   SKMD: {
-    captureAfterShowMinutes: 14,
-    fallbackCaptureAfterMinutes: 14,
-    captureBeforeCutoffMinutes: 0,
-    note: "Sri Krishna captures 14 minutes after showtime; BMS cutoff time is ignored."
+    fallbackCaptureAfterMinutes: 12,
+    captureBeforeCutoffMinutes: 3,
+    note: "Sri Krishna captures about 3 minutes before the 15-minute cutoff."
   },
   SAIC: {
     fallbackCaptureAfterMinutes: -3,
     captureBeforeCutoffMinutes: 0,
     includeBlockedSeatsInBoxoffice: true,
     note: "Sai Chitra TicketNew shows can disappear at showtime, so capture starts before showtime."
-  }
-};
-
-const MANUAL_PLAN_OVERRIDES = {
-  "2026-05-28": {
-    note: "Manual plan override added because BMS discovery is blocked and the known May 28 plan is 5 theatres with 4 shows each.",
-    theatres: {
-      RTDM: ["11:00 AM", "02:15 PM", "06:00 PM", "09:15 PM"],
-      MSDR: ["11:00 AM", "02:15 PM", "06:15 PM", "09:15 PM"],
-      ASRM: ["11:00 AM", "02:15 PM", "06:00 PM", "09:15 PM"],
-      SKMD: ["11:00 AM", "02:00 PM", "06:00 PM", "09:00 PM"],
-      SAIC: ["11:00 AM", "02:15 PM", "06:00 PM", "09:15 PM"]
-    }
-  },
-  "2026-06-04": {
-    note: "Manual plan override added because Vercel BMS discovery is blocked and June 4 was verified locally as 5 theatres with 6 Peddi shows each.",
-    theatres: {
-      RTDM: ["12:30 AM", "05:00 AM", "09:00 AM", "01:30 PM", "05:30 PM", "09:30 PM"],
-      MSDR: ["12:30 AM", "05:00 AM", "09:00 AM", "01:30 PM", "05:30 PM", "09:30 PM"],
-      ASRM: ["12:30 AM", "05:00 AM", "09:00 AM", "01:30 PM", "05:30 PM", "09:30 PM"],
-      SKMD: ["12:30 AM", "05:00 AM", "09:00 AM", "01:30 PM", "05:30 PM", "09:30 PM"],
-      SAIC: ["12:30 AM", "05:00 AM", "09:00 AM", "01:30 PM", "05:30 PM", "09:30 PM"]
-    }
   }
 };
 
@@ -109,140 +81,7 @@ function addMinutesToIso(iso, minutes) {
   return date.toISOString();
 }
 
-function timeLabelToParts(label) {
-  const match = String(label || "").trim().match(/^(\d{1,2}):(\d{2})\s*([AP]M)$/i);
-  if (!match) return null;
-
-  let hour = Number(match[1]);
-  const minute = Number(match[2]);
-  const meridiem = match[3].toUpperCase();
-  if (meridiem === "PM" && hour !== 12) hour += 12;
-  if (meridiem === "AM" && hour === 12) hour = 0;
-
-  return {
-    hour: String(hour).padStart(2, "0"),
-    minute: String(minute).padStart(2, "0")
-  };
-}
-
-function manualPlanKey(venueCode, showDateTimeCode) {
-  return [venueCode || "", showDateTimeCode || "", "MANUAL-PLAN", ""].join("::");
-}
-
-function buildManualPlannedShow({ date, theatre, showTimeLabel, policy, note }) {
-  const parts = timeLabelToParts(showTimeLabel);
-  if (!parts) return null;
-
-  const showDateCode = isoToDateCode(date);
-  const showDateTimeCode = `${showDateCode}${parts.hour}${parts.minute}`;
-  const showDateTime = `${date}T${parts.hour}:${parts.minute}:00+05:30`;
-  const show = {
-    id: `MANUAL-PLAN-${theatre.venueCode}-${showDateTimeCode}`,
-    key: manualPlanKey(theatre.venueCode, showDateTimeCode),
-    eventCode: "",
-    sessionId: "",
-    platform: theatre.platform || "bookmyshow",
-    venueCode: theatre.venueCode,
-    venueName: theatre.name,
-    theatreShortName: theatre.shortName,
-    citySlug: CITY.slug,
-    showDate: date,
-    showDateCode,
-    showDateTime,
-    showDateTimeCode,
-    showTimeLabel,
-    cutoffAt: "",
-    cutoffCode: "",
-    format: "",
-    language: "",
-    title: "Manual planned show",
-    releaseLabel: "Manual planned show",
-    screenName: theatre.shortName,
-    totalSeats: 0,
-    availableSeats: 0,
-    soldSeats: 0,
-    gross: 0,
-    occupancyPercent: 0,
-    plannedOnly: true,
-    manualPlan: true,
-    source: {
-      method: "manual-plan-override",
-      note
-    },
-    capturePolicy: policy
-  };
-
-  return {
-    ...show,
-    captureAt: resolveCaptureAt(show, policy)
-  };
-}
-
-function applyManualPlanOverride({ plannedByKey, date, theatres, notes }) {
-  const override = MANUAL_PLAN_OVERRIDES[date];
-  if (!override) return;
-
-  const theatreByCode = new Map(theatres.map((theatre) => [theatre.venueCode, theatre]));
-  const existingSlots = new Map();
-  for (const [key, show] of plannedByKey.entries()) {
-    existingSlots.set(`${show.venueCode || ""}::${show.showDateTimeCode || ""}`, { key, show });
-  }
-
-  for (const [venueCode, slots] of Object.entries(override.theatres || {})) {
-    const theatre = theatreByCode.get(venueCode);
-    if (!theatre) continue;
-    const policy = CAPTURE_POLICY[theatre.venueCode] || {
-      fallbackCaptureAfterMinutes: theatre.fallbackCutoffMinutes || 15,
-      captureBeforeCutoffMinutes: 1,
-      note: "Fallback theatre capture policy."
-    };
-
-    for (const showTimeLabel of slots) {
-      const plannedShow = buildManualPlannedShow({
-        date,
-        theatre,
-        showTimeLabel,
-        policy,
-        note: override.note
-      });
-      if (!plannedShow) continue;
-      const slotKey = `${plannedShow.venueCode}::${plannedShow.showDateTimeCode}`;
-      const existing = existingSlots.get(slotKey);
-      if (existing && !existing.show.plannedOnly) continue;
-      if (existing) plannedByKey.delete(existing.key);
-      plannedByKey.set(plannedShow.key, plannedShow);
-      existingSlots.set(slotKey, { key: plannedShow.key, show: plannedShow });
-    }
-  }
-
-  if (override.note) notes.push(override.note);
-}
-
-function refreshPlannedCapturePolicies({ plannedByKey, theatres }) {
-  const theatreByCode = new Map(theatres.map((theatre) => [theatre.venueCode, theatre]));
-
-  for (const [key, show] of plannedByKey.entries()) {
-    if (!show.showDateTime) continue;
-    const theatre = theatreByCode.get(show.venueCode);
-    const policy = CAPTURE_POLICY[show.venueCode] || {
-      fallbackCaptureAfterMinutes: theatre?.fallbackCutoffMinutes || 15,
-      captureBeforeCutoffMinutes: 1,
-      note: "Fallback theatre capture policy."
-    };
-
-    plannedByKey.set(key, {
-      ...show,
-      captureAt: resolveCaptureAt(show, policy),
-      capturePolicy: policy
-    });
-  }
-}
-
 function resolveCaptureAt(show, policy) {
-  if (Number.isFinite(Number(policy.captureAfterShowMinutes))) {
-    return addMinutesToIso(show.showDateTime, number(policy.captureAfterShowMinutes));
-  }
-
   if (show.cutoffAt) {
     const cutoff = new Date(show.cutoffAt);
     if (Number.isFinite(cutoff.getTime())) {
@@ -270,7 +109,7 @@ function compareShows(left, right) {
 }
 
 function summarize(shows) {
-  const totalShows = shows.reduce((sum, show) => sum + number(show.boxofficeShowCount || 1), 0);
+  const totalShows = shows.length;
   const totalCapacity = shows.reduce((sum, show) => sum + number(show.totalSeats), 0);
   const totalAvailable = shows.reduce((sum, show) => sum + number(show.availableSeats), 0);
   const totalSold = shows.reduce((sum, show) => sum + number(show.soldSeats), 0);
@@ -286,211 +125,6 @@ function summarize(shows) {
     ff: 0,
     hf: 0
   };
-}
-
-function parseBfilmyMovieKey(movieKey) {
-  const value = String(movieKey || "").trim();
-  const match = value.match(/^(.*?)\s*\[([^|\]]+)\|\s*([^\]]+)\]\s*$/);
-  if (!match) {
-    return {
-      title: value || "Unknown Movie",
-      format: "",
-      language: ""
-    };
-  }
-
-  return {
-    title: match[1].trim() || "Unknown Movie",
-    format: match[2].trim(),
-    language: match[3].trim()
-  };
-}
-
-function normalizeBfilmyChainVenue(chainName) {
-  const value = String(chainName || "").trim();
-  const normalized = value.toLowerCase();
-
-  if (!normalized.includes("madanapalle")) return null;
-  if (normalized.includes("siddartha")) {
-    return {
-      venueCode: "MSDR",
-      venueName: "Siddartha Cinemas:Screen 2 Dolby Laser,Madanapalle",
-      theatreShortName: "Siddartha"
-    };
-  }
-  if (normalized.includes("sri krishna")) {
-    return {
-      venueCode: "SKMD",
-      venueName: "Sri Krishna A/C 4K Dolby Atmos: Madanapalle",
-      theatreShortName: "Sri Krishna"
-    };
-  }
-  if (normalized.includes("ravi")) {
-    return {
-      venueCode: "RTDM",
-      venueName: "Ravi A/C 4K Laser Dolby Surround 7.1: Madanapalle",
-      theatreShortName: "Ravi"
-    };
-  }
-  if (normalized.includes("asr")) {
-    return {
-      venueCode: "ASRM",
-      venueName: "ASR A/C 4K Laser Dolby Surround 7.1: Madanapalle",
-      theatreShortName: "ASR"
-    };
-  }
-
-  return {
-    venueCode: `BFILMY-${value.replace(/[^A-Za-z0-9]+/g, "-").replace(/^-|-$/g, "").toUpperCase()}`,
-    venueName: value,
-    theatreShortName: value.replace(/:.*$/, "").trim() || "BFilmy venue"
-  };
-}
-
-function buildBfilmyCityFallback({ date, payload, generatedAt }) {
-  const captures = [];
-  const venueCaptures = [];
-  const moviesPayload = payload?.movies && typeof payload.movies === "object" ? payload.movies : {};
-
-  for (const [movieKey, movie] of Object.entries(moviesPayload)) {
-    const cityRow = (movie?.details || []).find(
-      (entry) => String(entry?.city || "").toLowerCase() === "madanapalle"
-    );
-    if (!cityRow) continue;
-
-    const parsedMovie = parseBfilmyMovieKey(movieKey);
-    const totalSeats = number(cityRow.totalSeats);
-    const soldSeats = number(cityRow.sold);
-    const gross = number(cityRow.gross);
-    const showCount = number(cityRow.shows);
-    const venueCount = number(cityRow.venues);
-
-    captures.push({
-      id: `BFILMY-${date}-${movieKey}`,
-      key: `BFILMY::${date}::${movieKey}`,
-      eventCode: "",
-      sessionId: "",
-      platform: "bfilmy",
-      venueCode: "BFILMY",
-      venueName: "BFilmy Madanapalle City Feed",
-      theatreShortName: "City Feed",
-      citySlug: CITY.slug,
-      showDate: date,
-      showDateCode: isoToDateCode(date),
-      showDateTime: `${date}T00:00:00+05:30`,
-      showDateTimeCode: `${isoToDateCode(date)}0000`,
-      showTimeLabel: "City",
-      cutoffAt: "",
-      cutoffCode: "",
-      format: parsedMovie.format,
-      language: parsedMovie.language,
-      title: parsedMovie.title,
-      releaseLabel: parsedMovie.title,
-      screenName: "Madanapalle",
-      totalSeats,
-      availableSeats: Math.max(totalSeats - soldSeats, 0),
-      soldSeats,
-      gross,
-      occupancyPercent: totalSeats ? Number(((soldSeats / totalSeats) * 100).toFixed(2)) : number(cityRow.occupancy),
-      ff: number(cityRow.fastfilling),
-      hf: number(cityRow.housefull),
-      boxofficeShowCount: showCount,
-      boxofficeVenueCount: venueCount,
-      boxofficeSource: {
-        method: "bfilmy-city-summary",
-        capturedAt: generatedAt,
-        lastUpdated: payload.last_updated || ""
-      }
-    });
-
-    for (const chainRow of movie?.Chain_details || []) {
-      const venue = normalizeBfilmyChainVenue(chainRow.chain);
-      if (!venue) continue;
-
-      const chainTotalSeats = number(chainRow.totalSeats);
-      const chainSoldSeats = number(chainRow.sold);
-      venueCaptures.push({
-        id: `BFILMY-VENUE-${date}-${movieKey}-${chainRow.chain}`,
-        key: `BFILMY-VENUE::${date}::${movieKey}::${chainRow.chain}`,
-        eventCode: "",
-        sessionId: "",
-        platform: "bfilmy",
-        ...venue,
-        citySlug: CITY.slug,
-        showDate: date,
-        showDateCode: isoToDateCode(date),
-        showDateTime: `${date}T00:00:00+05:30`,
-        showDateTimeCode: `${isoToDateCode(date)}0000`,
-        showTimeLabel: "Venue",
-        cutoffAt: "",
-        cutoffCode: "",
-        format: parsedMovie.format,
-        language: parsedMovie.language,
-        title: parsedMovie.title,
-        releaseLabel: parsedMovie.title,
-        screenName: venue.theatreShortName,
-        totalSeats: chainTotalSeats,
-        availableSeats: Math.max(chainTotalSeats - chainSoldSeats, 0),
-        soldSeats: chainSoldSeats,
-        gross: number(chainRow.gross),
-        occupancyPercent: chainTotalSeats
-          ? Number(((chainSoldSeats / chainTotalSeats) * 100).toFixed(2))
-          : number(chainRow.occupancy),
-        ff: number(chainRow.fastfilling),
-        hf: number(chainRow.housefull),
-        boxofficeShowCount: number(chainRow.shows),
-        boxofficeVenueCount: number(chainRow.venues),
-        boxofficeSource: {
-          method: "bfilmy-chain-summary",
-          capturedAt: generatedAt,
-          lastUpdated: payload.last_updated || "",
-          chain: chainRow.chain
-        }
-      });
-    }
-  }
-
-  if (!captures.length) return null;
-
-  const summary = summarize(captures);
-  summary.ff = captures.reduce((sum, show) => sum + number(show.ff), 0);
-  summary.hf = captures.reduce((sum, show) => sum + number(show.hf), 0);
-
-  return {
-    source: "bfilmy-daily-city-summary",
-    lastUpdated: payload.last_updated || "",
-    generatedAt,
-    summary,
-    theatres: summarizeByTheatre(venueCaptures),
-    movies: summarizeByMovie(captures),
-    captures,
-    venueCaptures,
-    city: CITY
-  };
-}
-
-async function fetchBfilmyCityFallback({ date, fetchImpl = fetch, generatedAt }) {
-  const url = `${BFILMY_DAILY_DATA_BASE_URL}/${isoToDateCode(date)}/finalsummary.json?ts=${Date.now()}`;
-  const response = await fetchImpl(url, {
-    cache: "no-store",
-    headers: {
-      accept: "application/json, text/plain, */*",
-      referer: "https://bfilmy.pages.dev/Live%20Boxoffice/",
-      "user-agent":
-        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36"
-    }
-  });
-  const text = await response.text();
-
-  if (!response.ok) {
-    throw new Error(`BFilmy city summary failed: ${response.status} ${text.slice(0, 120)}`);
-  }
-
-  return buildBfilmyCityFallback({
-    date,
-    payload: JSON.parse(text),
-    generatedAt
-  });
 }
 
 function summarizeByTheatre(shows) {
@@ -612,10 +246,8 @@ async function fetchLiveTheatreSnapshot({ liveApiBase, date, venueCode, fetchImp
   return data;
 }
 
-function buildOutput({ date, existing, captures, plannedShows, errors, generatedAt, bfilmyFallback }) {
+function buildOutput({ date, existing, captures, plannedShows, errors, generatedAt }) {
   const sortedCaptures = [...captures].sort(compareShows);
-  const shouldUseBfilmyFallback = Boolean(bfilmyFallback && errors.length && !sortedCaptures.length);
-  const publishedCaptures = shouldUseBfilmyFallback ? [] : sortedCaptures;
 
   return {
     version: 1,
@@ -626,88 +258,18 @@ function buildOutput({ date, existing, captures, plannedShows, errors, generated
     timezone: INDIA_TIMEZONE,
     city: CITY,
     capturePolicy: CAPTURE_POLICY,
-    summary: shouldUseBfilmyFallback ? bfilmyFallback.summary : summarize(sortedCaptures),
-    theatres: shouldUseBfilmyFallback ? bfilmyFallback.theatres : summarizeByTheatre(sortedCaptures),
-    movies: shouldUseBfilmyFallback ? bfilmyFallback.movies : summarizeByMovie(sortedCaptures),
-    captures: publishedCaptures,
-    partialCaptures: shouldUseBfilmyFallback ? sortedCaptures : [],
+    summary: summarize(sortedCaptures),
+    theatres: summarizeByTheatre(sortedCaptures),
+    movies: summarizeByMovie(sortedCaptures),
+    captures: sortedCaptures,
     plannedShows: [...plannedShows].sort(compareShows),
     meta: {
-      status: errors.length ? (shouldUseBfilmyFallback ? "fallback" : "partial") : "ok",
-      source: shouldUseBfilmyFallback ? "bfilmy-daily-city-summary" : "vercel-scheduled-boxoffice",
+      status: errors.length ? "partial" : "ok",
+      source: "vercel-scheduled-boxoffice",
       previousGeneratedAt: existing?.generatedAt || null,
-      errors,
-      bfilmyFallback: bfilmyFallback
-        ? {
-            used: shouldUseBfilmyFallback,
-            source: bfilmyFallback.source,
-            lastUpdated: bfilmyFallback.lastUpdated,
-            totalGross: bfilmyFallback.summary.totalGross,
-            totalSold: bfilmyFallback.summary.totalSold,
-            totalShows: bfilmyFallback.summary.totalShows,
-            movies: bfilmyFallback.movies.length,
-            theatreRows: bfilmyFallback.theatres.length
-          }
-        : null
+      errors
     }
   };
-}
-
-export async function applyBfilmyCityFallback(snapshot, { fetchImpl = fetch, generatedAt = new Date().toISOString() } = {}) {
-  const errors = snapshot?.meta?.errors || [];
-  if (!snapshot || !errors.length) return snapshot;
-
-  const storedCaptures = snapshot.captures?.length ? snapshot.captures : snapshot.partialCaptures || [];
-  if (storedCaptures.length) {
-    return buildOutput({
-      date: snapshot.targetDate,
-      existing: snapshot,
-      captures: storedCaptures,
-      plannedShows: snapshot.plannedShows || [],
-      errors,
-      generatedAt: snapshot.generatedAt || generatedAt,
-      bfilmyFallback: null
-    });
-  }
-
-  if (snapshot.meta?.bfilmyFallback?.used && Number(snapshot.meta?.bfilmyFallback?.theatreRows || 0) > 0) {
-    return {
-      ...snapshot,
-      captures: [],
-      partialCaptures: snapshot.partialCaptures || snapshot.captures || []
-    };
-  }
-
-  let bfilmyFallback = null;
-  try {
-    bfilmyFallback = await fetchBfilmyCityFallback({
-      date: snapshot.targetDate,
-      fetchImpl,
-      generatedAt
-    });
-  } catch (error) {
-    return {
-      ...snapshot,
-      meta: {
-        ...(snapshot.meta || {}),
-        errors: [
-          ...errors,
-          `BFilmy city summary: ${error.message}`
-        ]
-      }
-    };
-  }
-  if (!bfilmyFallback) return snapshot;
-
-  return buildOutput({
-    date: snapshot.targetDate,
-    existing: snapshot,
-    captures: snapshot.captures || [],
-    plannedShows: snapshot.plannedShows || [],
-    errors,
-    generatedAt,
-    bfilmyFallback
-  });
 }
 
 export async function collectBoxofficeSnapshot({
@@ -764,34 +326,13 @@ export async function collectBoxofficeSnapshot({
     })
   );
 
-  applyManualPlanOverride({
-    plannedByKey,
-    date,
-    theatres,
-    notes: errors
-  });
-  refreshPlannedCapturePolicies({
-    plannedByKey,
-    theatres
-  });
-
-  let bfilmyFallback = null;
-  if (errors.length) {
-    try {
-      bfilmyFallback = await fetchBfilmyCityFallback({ date, fetchImpl, generatedAt });
-    } catch (error) {
-      errors.push(`BFilmy city summary: ${error.message}`);
-    }
-  }
-
   const data = buildOutput({
     date,
     existing,
     captures: Array.from(capturesByKey.values()),
     plannedShows: Array.from(plannedByKey.values()),
     errors,
-    generatedAt,
-    bfilmyFallback
+    generatedAt
   });
 
   return writeBoxofficeSnapshot(data);

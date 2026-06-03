@@ -16,28 +16,24 @@ const INDIA_TIMEZONE = "Asia/Kolkata";
 const ACTIVE_THEATRES = new Set(["RTDM", "MSDR", "ASRM", "SKMD", "SAIC"]);
 const CAPTURE_POLICY = {
   RTDM: {
-    captureAfterShowMinutes: 28,
-    fallbackCaptureAfterMinutes: 28,
-    captureBeforeCutoffMinutes: 0,
-    note: "Ravi captures 28 minutes after showtime; BMS cutoff time is ignored."
+    fallbackCaptureAfterMinutes: 25,
+    captureBeforeCutoffMinutes: 5,
+    note: "Ravi BMS payload currently exposes a 30-minute cutoff, so capture about 5 minutes before cutoff."
   },
   MSDR: {
-    captureAfterShowMinutes: 28,
-    fallbackCaptureAfterMinutes: 28,
-    captureBeforeCutoffMinutes: 0,
-    note: "Siddartha captures 28 minutes after showtime; BMS cutoff time is ignored."
+    fallbackCaptureAfterMinutes: 25,
+    captureBeforeCutoffMinutes: 5,
+    note: "Siddartha BMS payload currently exposes a 30-minute cutoff, so capture about 5 minutes before cutoff."
   },
   ASRM: {
-    captureAfterShowMinutes: 14,
-    fallbackCaptureAfterMinutes: 14,
-    captureBeforeCutoffMinutes: 0,
-    note: "ASR captures 14 minutes after showtime; BMS cutoff time is ignored."
+    fallbackCaptureAfterMinutes: 12,
+    captureBeforeCutoffMinutes: 3,
+    note: "ASR cutoff is 15 minutes after showtime, so capture about 3 minutes before cutoff."
   },
   SKMD: {
-    captureAfterShowMinutes: 14,
-    fallbackCaptureAfterMinutes: 14,
-    captureBeforeCutoffMinutes: 0,
-    note: "Sri Krishna captures 14 minutes after showtime; BMS cutoff time is ignored."
+    fallbackCaptureAfterMinutes: 12,
+    captureBeforeCutoffMinutes: 3,
+    note: "Sri Krishna cutoff is 15 minutes after showtime, so capture about 3 minutes before cutoff."
   },
   SAIC: {
     fallbackCaptureAfterMinutes: -3,
@@ -91,10 +87,6 @@ function addMinutesToShowIso(showIso, minutes) {
 }
 
 function resolveCaptureAt(show, policy) {
-  if (Number.isFinite(Number(policy.captureAfterShowMinutes))) {
-    return addMinutesToShowIso(show.showDateTime, number(policy.captureAfterShowMinutes));
-  }
-
   if (show.cutoffAt) {
     const cutoffDate = new Date(show.cutoffAt);
     if (Number.isFinite(cutoffDate.getTime())) {
