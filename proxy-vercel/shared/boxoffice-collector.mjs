@@ -678,11 +678,25 @@ export async function applyBfilmyCityFallback(snapshot, { fetchImpl = fetch, gen
     };
   }
 
-  const bfilmyFallback = await fetchBfilmyCityFallback({
-    date: snapshot.targetDate,
-    fetchImpl,
-    generatedAt
-  });
+  let bfilmyFallback = null;
+  try {
+    bfilmyFallback = await fetchBfilmyCityFallback({
+      date: snapshot.targetDate,
+      fetchImpl,
+      generatedAt
+    });
+  } catch (error) {
+    return {
+      ...snapshot,
+      meta: {
+        ...(snapshot.meta || {}),
+        errors: [
+          ...errors,
+          `BFilmy city summary: ${error.message}`
+        ]
+      }
+    };
+  }
   if (!bfilmyFallback) return snapshot;
 
   return buildOutput({
