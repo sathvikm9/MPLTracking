@@ -57,6 +57,16 @@ const MANUAL_PLAN_OVERRIDES = {
       SKMD: ["11:00 AM", "02:00 PM", "06:00 PM", "09:00 PM"],
       SAIC: ["11:00 AM", "02:15 PM", "06:00 PM", "09:15 PM"]
     }
+  },
+  "2026-06-04": {
+    note: "Manual plan override added because Vercel BMS discovery is blocked and June 4 was verified locally as 5 theatres with 6 Peddi shows each.",
+    theatres: {
+      RTDM: ["12:30 AM", "05:00 AM", "09:00 AM", "01:30 PM", "05:30 PM", "09:30 PM"],
+      MSDR: ["12:30 AM", "05:00 AM", "09:00 AM", "01:30 PM", "05:30 PM", "09:30 PM"],
+      ASRM: ["12:30 AM", "05:00 AM", "09:00 AM", "01:30 PM", "05:30 PM", "09:30 PM"],
+      SKMD: ["12:30 AM", "05:00 AM", "09:00 AM", "01:30 PM", "05:30 PM", "09:30 PM"],
+      SAIC: ["12:30 AM", "05:00 AM", "09:00 AM", "01:30 PM", "05:30 PM", "09:30 PM"]
+    }
   }
 };
 
