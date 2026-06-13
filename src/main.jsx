@@ -8,6 +8,7 @@ const SERVER_ERROR_MESSAGE = "Server is not responding, please try again later."
 const LIVE_TRACKING_UNAVAILABLE_MESSAGE =
   "BMS live theatre data is blocked right now; showing any available fallback rows.";
 const THEATRE_SELECTION_MESSAGE = "Select a theatre or All Theatres to load live data.";
+const BFILMY_DAILY_DATA_BASE_URL = "https://bfilmyapi.pages.dev/daily/data";
 const LAST_GOOD_DASHBOARD_CACHE_PREFIX = "mpltracking:last-good-live";
 const LAST_GOOD_DASHBOARD_CACHE_MAX_AGE_MS = 1000 * 60 * 60 * 6;
 const CITY_INFO = {
@@ -625,15 +626,16 @@ function getInitialScreen() {
   if (typeof window === "undefined") return "tracking";
 
   const view = new URLSearchParams(window.location.search).get("view");
-  return view === "boxoffice" ? "boxoffice" : "tracking";
+  if (view === "boxoffice" || view === "bfilmy") return view;
+  return "tracking";
 }
 
 function syncScreenToUrl(screen) {
   if (typeof window === "undefined") return;
 
   const url = new URL(window.location.href);
-  if (screen === "boxoffice") {
-    url.searchParams.set("view", "boxoffice");
+  if (screen === "boxoffice" || screen === "bfilmy") {
+    url.searchParams.set("view", screen);
   } else {
     url.searchParams.delete("view");
   }
@@ -1247,6 +1249,193 @@ function useBoxofficeData(selectedDate) {
   return { ...state, refresh };
 }
 
+function parseBfilmyMovieKey(movieKey) {
+  const value = String(movieKey || "").trim();
+  const match = value.match(/^(.*?)\s*\[(.*?)\s*\|\s*(.*?)\]$/);
+  if (!match) {
+    return {
+      title: value || "Untitled Movie",
+      format: "",
+      language: ""
+    };
+  }
+
+  return {
+    title: match[1].trim(),
+    format: match[2].trim(),
+    language: match[3].trim()
+  };
+}
+
+function isMadanapalleCity(value) {
+  return String(value || "").trim().toLowerCase() === "madanapalle";
+}
+
+function isMadanapalleChain(value) {
+  return /madanapalle|madanapalli/i.test(String(value || ""));
+}
+
+function normalizeBfilmyData(payload, selectedDate) {
+  const movies = [];
+  const theatres = [];
+  const cityRows = [];
+
+  for (const [movieKey, moviePayload] of Object.entries(payload?.movies || {})) {
+    const movieInfo = parseBfilmyMovieKey(movieKey);
+    const cityEntry = (moviePayload?.details || []).find((entry) => isMadanapalleCity(entry?.city));
+
+    if (cityEntry) {
+      movies.push({
+        id: movieKey,
+        key: movieKey,
+        title: movieInfo.title,
+        format: movieInfo.format,
+        language: movieInfo.language,
+        totalGross: toNumber(cityEntry.gross),
+        totalSold: toNumber(cityEntry.sold),
+        totalShows: toNumber(cityEntry.shows),
+        totalCapacity: toNumber(cityEntry.totalSeats),
+        totalAvailable: Math.max(toNumber(cityEntry.totalSeats) - toNumber(cityEntry.sold), 0),
+        ff: toNumber(cityEntry.fastfilling),
+        hf: toNumber(cityEntry.housefull),
+        occupancyPercent: toNumber(cityEntry.occupancy),
+        venues: toNumber(cityEntry.venues)
+      });
+      cityRows.push(cityEntry);
+    }
+
+    for (const chainEntry of moviePayload?.Chain_details || []) {
+      if (!isMadanapalleChain(chainEntry?.chain)) continue;
+
+      theatres.push({
+        id: `${movieKey}-${chainEntry.chain}`,
+        movie: movieInfo.title,
+        movieKey,
+        shortName: String(chainEntry.chain || "").replace(/\s*:\s*Madanapalle.*$/i, ""),
+        chain: chainEntry.chain,
+        totalGross: toNumber(chainEntry.gross),
+        totalSold: toNumber(chainEntry.sold),
+        totalShows: toNumber(chainEntry.shows),
+        totalCapacity: toNumber(chainEntry.totalSeats),
+        totalAvailable: Math.max(toNumber(chainEntry.totalSeats) - toNumber(chainEntry.sold), 0),
+        ff: toNumber(chainEntry.fastfilling),
+        hf: toNumber(chainEntry.housefull),
+        occupancyPercent: toNumber(chainEntry.occupancy)
+      });
+    }
+  }
+
+  const summary = movies.reduce(
+    (total, movie) => ({
+      totalShows: total.totalShows + movie.totalShows,
+      totalCapacity: total.totalCapacity + movie.totalCapacity,
+      totalAvailable: total.totalAvailable + movie.totalAvailable,
+      totalSold: total.totalSold + movie.totalSold,
+      totalGross: total.totalGross + movie.totalGross,
+      ff: total.ff + movie.ff,
+      hf: total.hf + movie.hf,
+      venues: total.venues + movie.venues
+    }),
+    {
+      totalShows: 0,
+      totalCapacity: 0,
+      totalAvailable: 0,
+      totalSold: 0,
+      totalGross: 0,
+      ff: 0,
+      hf: 0,
+      venues: 0
+    }
+  );
+
+  return {
+    version: 1,
+    generatedAt: payload?.last_updated || new Date().toISOString(),
+    targetDate: selectedDate,
+    targetDateCode: isoToDateCode(selectedDate),
+    timezone: CITY_INFO.timezone,
+    city: CITY_INFO,
+    summary: {
+      ...summary,
+      occupancyPercent: summary.totalCapacity
+        ? Number(((summary.totalSold / summary.totalCapacity) * 100).toFixed(2))
+        : 0
+    },
+    movies: movies.sort((left, right) => right.totalGross - left.totalGross),
+    theatres: theatres.sort((left, right) => right.totalGross - left.totalGross),
+    cityRows,
+    meta: {
+      status: movies.length ? "ok" : "empty",
+      source: "bfilmy-daily-finalsummary",
+      lastUpdated: payload?.last_updated || "",
+      rawMovieCount: Object.keys(payload?.movies || {}).length,
+      notes: [
+        "BFilmy data is aggregate-only. It does not include exact BMS show-level ledger rows.",
+        "Movie totals are filtered to Madanapalle city rows from BFilmy finalsummary.json."
+      ]
+    }
+  };
+}
+
+async function loadBfilmyData(selectedDate) {
+  const dateCode = isoToDateCode(selectedDate);
+  return normalizeBfilmyData(
+    await fetchJson(`${BFILMY_DAILY_DATA_BASE_URL}/${dateCode}/finalsummary.json?ts=${Date.now()}`),
+    selectedDate
+  );
+}
+
+function useBfilmyData(selectedDate) {
+  const [state, setState] = React.useState({
+    loading: true,
+    refreshing: false,
+    error: null,
+    data: null
+  });
+
+  const loadData = React.useCallback(
+    (mode = "initial") => {
+      const isInitial = mode === "initial";
+
+      setState((current) => ({
+        ...current,
+        loading: isInitial ? true : current.loading,
+        refreshing: !isInitial,
+        error: null
+      }));
+
+      loadBfilmyData(selectedDate)
+        .then((data) => {
+          setState({
+            loading: false,
+            refreshing: false,
+            error: null,
+            data
+          });
+        })
+        .catch((error) => {
+          setState({
+            loading: false,
+            refreshing: false,
+            error,
+            data: null
+          });
+        });
+    },
+    [selectedDate]
+  );
+
+  React.useEffect(() => {
+    loadData("initial");
+  }, [loadData]);
+
+  const refresh = React.useCallback(() => {
+    loadData("refresh");
+  }, [loadData]);
+
+  return { ...state, refresh };
+}
+
 function StatCard({ eyebrow, value, caption, tone = "default" }) {
   return (
     <article className={`stat-card stat-card--${tone}`}>
@@ -1424,6 +1613,13 @@ function ScreenSwitcher({ activeScreen, onChange }) {
         onClick={() => onChange("boxoffice")}
       >
         Boxoffice
+      </button>
+      <button
+        className={`screen-switcher__button${activeScreen === "bfilmy" ? " screen-switcher__button--active" : ""}`}
+        type="button"
+        onClick={() => onChange("bfilmy")}
+      >
+        BFilmy Data
       </button>
     </nav>
   );
@@ -1688,6 +1884,206 @@ function BoxofficeScreen({ screenSwitcher }) {
       </Section>
 
       <Notes notes={boxofficeNotes(data, usingBfilmyFallback)} />
+    </main>
+  );
+}
+
+function BfilmyScreen({ screenSwitcher }) {
+  const [selectedDate, setSelectedDate] = React.useState(getIndiaTodayIso);
+  const { loading, refreshing, error, data, refresh } = useBfilmyData(selectedDate);
+  const isBusy = loading || refreshing;
+  const summary = data?.summary || buildSummaryFromShows([]);
+  const theatres = data?.theatres || [];
+  const movies = data?.movies || [];
+  const hasSummary = movies.length || Number(summary.totalShows || 0) > 0;
+  const emptyMessage =
+    error?.status === 404
+      ? `No BFilmy data yet for ${formatSelectedDateLabel(selectedDate)}.`
+      : error
+        ? "BFilmy data is not available right now. Please try again later."
+        : isBusy
+          ? "Loading BFilmy data..."
+          : `No BFilmy Madanapalle rows found for ${formatSelectedDateLabel(selectedDate)}.`;
+
+  return (
+    <main className="app-shell">
+      {screenSwitcher}
+
+      <section className="hero hero--bfilmy">
+        <div className="hero__content">
+          <p className="hero__eyebrow">BFilmy Live Boxoffice</p>
+
+          <div className="selector-shell">
+            <label className="selector-select-shell selector-select-shell--date">
+              <span className="selector-select__label">Select BFilmy date</span>
+              <input
+                className="date-input"
+                type="date"
+                value={selectedDate}
+                onChange={(event) => setSelectedDate(event.target.value || getIndiaTodayIso())}
+              />
+            </label>
+          </div>
+
+          <div
+            className={`status-panel${
+              error ? " status-panel--error" : isBusy ? " status-panel--loading" : ""
+            }`}
+          >
+            {isBusy ? <span className="status-spinner" aria-hidden="true" /> : null}
+            <span>
+              {isBusy
+                ? "Loading BFilmy live boxoffice..."
+                : error
+                  ? emptyMessage
+                  : `BFilmy live aggregate loaded with ${number(summary.totalShows)} Madanapalle shows.`}
+            </span>
+          </div>
+
+          <div className="hero__actions">
+            <button className="refresh-button" onClick={refresh} disabled={isBusy}>
+              {isBusy ? <span className="button-spinner" aria-hidden="true" /> : null}
+              {refreshing ? "Refreshing BFilmy..." : "Refresh BFilmy data"}
+            </button>
+          </div>
+        </div>
+
+        <div className="hero__meta">
+          <div className="meta-pill">
+            <span>BFilmy Date</span>
+            <strong>{formatSelectedDateLabel(selectedDate)}</strong>
+          </div>
+          <div className="meta-pill">
+            <span>BFilmy Updated</span>
+            <strong>{data?.meta?.lastUpdated || "Not loaded yet"}</strong>
+            <small>{data ? "From finalsummary.json" : "Waiting for BFilmy feed"}</small>
+          </div>
+          <div className="meta-pill">
+            <span>Shows</span>
+            <strong>{number(summary.totalShows)}</strong>
+            <small>{number(summary.venues || theatres.length)} venue rows from BFilmy city totals</small>
+          </div>
+          <div className="meta-pill">
+            <span>Status</span>
+            <strong>{data?.meta?.status || (error ? "not ready" : "loading")}</strong>
+            <small>Aggregate feed, not show ledger</small>
+          </div>
+        </div>
+      </section>
+
+      <section className="stats-grid">
+        <StatCard
+          eyebrow="Gross"
+          value={currency(summary.totalGross)}
+          caption={`${number(summary.totalShows)} BFilmy shows`}
+          tone="ink"
+        />
+        <StatCard
+          eyebrow="Tickets"
+          value={number(summary.totalSold)}
+          caption={`${number(summary.totalCapacity)} total seats in BFilmy rows`}
+          tone="warm"
+        />
+        <StatCard
+          eyebrow="Occupancy"
+          value={percent(summary.occupancyPercent)}
+          caption={`${number(summary.totalAvailable)} seats available by aggregate`}
+          tone="amber"
+        />
+        <StatCard
+          eyebrow="Movies"
+          value={number(movies.length)}
+          caption={`${number(theatres.length)} visible theatre/chain rows`}
+        />
+      </section>
+
+      <Section
+        title="City Summary"
+        kicker="Madanapalle day total"
+        aside={<span className="section__hint">BFilmy city feed</span>}
+      >
+        <Table
+          columns={[
+            { key: "city", label: "City" },
+            { key: "state", label: "State" },
+            { key: "gross", label: "Gross", render: (row) => currency(row.gross) },
+            { key: "tickets", label: "Tickets", render: (row) => number(row.tickets) },
+            { key: "shows", label: "Shows", render: (row) => number(row.shows) },
+            { key: "ff", label: "FF", render: (row) => number(row.ff) },
+            { key: "hf", label: "HF", render: (row) => number(row.hf) },
+            { key: "occ", label: "Occ", render: (row) => percent(row.occ) }
+          ]}
+          rows={
+            hasSummary
+              ? [
+                  {
+                    id: "madanapalle",
+                    city: CITY_INFO.name,
+                    state: CITY_INFO.state,
+                    gross: summary.totalGross,
+                    tickets: summary.totalSold,
+                    shows: summary.totalShows,
+                    ff: summary.ff || 0,
+                    hf: summary.hf || 0,
+                    occ: summary.occupancyPercent
+                  }
+                ]
+              : []
+          }
+          emptyMessage={emptyMessage}
+        />
+      </Section>
+
+      <Section
+        title="BFilmy Theatre Chains"
+        kicker="Visible chain format"
+        aside={<span className="section__hint">{number(theatres.length)} chain rows</span>}
+      >
+        <Table
+          columns={[
+            { key: "shortName", label: "Theatre / Chain" },
+            { key: "movie", label: "Movie" },
+            { key: "totalGross", label: "Gross", render: (row) => currency(row.totalGross) },
+            { key: "totalSold", label: "Tickets", render: (row) => number(row.totalSold) },
+            { key: "totalShows", label: "Shows", render: (row) => number(row.totalShows) },
+            { key: "ff", label: "FF", render: (row) => number(row.ff) },
+            { key: "hf", label: "HF", render: (row) => number(row.hf) },
+            { key: "occupancyPercent", label: "Occ", render: (row) => percent(row.occupancyPercent) }
+          ]}
+          rows={theatres}
+          emptyMessage={emptyMessage}
+        />
+      </Section>
+
+      <Section
+        title="Movies in Madanapalle"
+        kicker="BFilmy movie format"
+        aside={<span className="section__hint">{number(movies.length)} movies</span>}
+      >
+        <Table
+          columns={[
+            {
+              key: "title",
+              label: "Movie",
+              render: (movie) => (
+                <strong>
+                  {movie.title} [{movie.format || "NA"} | {movie.language || "NA"}]
+                </strong>
+              )
+            },
+            { key: "totalGross", label: "Gross", render: (movie) => currency(movie.totalGross) },
+            { key: "totalSold", label: "Sold", render: (movie) => number(movie.totalSold) },
+            { key: "totalShows", label: "Shows", render: (movie) => number(movie.totalShows) },
+            { key: "ff", label: "FF", render: (movie) => number(movie.ff) },
+            { key: "hf", label: "HF", render: (movie) => number(movie.hf) },
+            { key: "occupancyPercent", label: "Occ", render: (movie) => percent(movie.occupancyPercent) }
+          ]}
+          rows={movies}
+          emptyMessage={emptyMessage}
+        />
+      </Section>
+
+      <Notes notes={data?.meta?.notes || []} />
     </main>
   );
 }
@@ -2034,11 +2430,15 @@ function App() {
     <ScreenSwitcher activeScreen={activeScreen} onChange={setActiveScreen} />
   );
 
-  return activeScreen === "boxoffice" ? (
-    <BoxofficeScreen screenSwitcher={screenSwitcher} />
-  ) : (
-    <LiveTrackingScreen screenSwitcher={screenSwitcher} />
-  );
+  if (activeScreen === "boxoffice") {
+    return <BoxofficeScreen screenSwitcher={screenSwitcher} />;
+  }
+
+  if (activeScreen === "bfilmy") {
+    return <BfilmyScreen screenSwitcher={screenSwitcher} />;
+  }
+
+  return <LiveTrackingScreen screenSwitcher={screenSwitcher} />;
 }
 
 ReactDOM.createRoot(document.getElementById("root")).render(
