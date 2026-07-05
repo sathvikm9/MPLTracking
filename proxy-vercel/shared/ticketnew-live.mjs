@@ -174,6 +174,23 @@ function buildSessionMovieMap(cinemaSessions) {
   return map;
 }
 
+function fallbackMovieFromArrangedSessions(cinemaSessions) {
+  const groups = (cinemaSessions?.arrangedSessions || []).filter(
+    (group) => group?.entityCode || group?.entityName || group?.data?.name
+  );
+  if (groups.length !== 1) return null;
+
+  const group = groups[0];
+  return {
+    contentId: group.entityCode,
+    title: group.entityName || group.data?.name || "Untitled Movie",
+    censor: group.data?.censor || "",
+    genres: group.data?.genre || group.data?.grn || [],
+    language: group.data?.lang || "",
+    format: group.data?.scrnFmt?.[0] || "2D"
+  };
+}
+
 async function fetchTheatrePage({ date, fetchImpl }) {
   const url = new URL(TICKETNEW_BASE_URL);
   if (date) url.searchParams.set("fromdate", date);
@@ -400,6 +417,7 @@ export async function fetchSaiChitraTicketNewShows({ date, fetchImpl = fetch }) 
   const nextData = extractNextData(theatrePage.html);
   const cinemaSessions = findCinemaSessions(nextData, date);
   const movieBySessionId = buildSessionMovieMap(cinemaSessions);
+  const fallbackMovie = fallbackMovieFromArrangedSessions(cinemaSessions);
   const sessions = (cinemaSessions?.pageData?.sessions || []).filter((session) => {
     const info = indiaDateInfoFromSession(session);
     return info.showDate === date;
@@ -407,13 +425,15 @@ export async function fetchSaiChitraTicketNewShows({ date, fetchImpl = fetch }) 
 
   const shows = await Promise.all(
     sessions.map(async (session) => {
-      const movie = movieBySessionId.get(session.sid) || {
-        contentId: session.contentId,
-        title: "Untitled Movie",
-        language: session.lang,
-        format: session.scrnFmt,
-        genres: session.gnrs || []
-      };
+      const movie =
+        movieBySessionId.get(session.sid) ||
+        fallbackMovie || {
+          contentId: session.contentId || session.mid,
+          title: "Untitled Movie",
+          language: session.lang,
+          format: session.scrnFmt,
+          genres: session.gnrs || []
+        };
       const seatMap = await fetchSeatMap({ session, movie, fetchImpl });
       const categories = categoriesFromSeatMap(session, seatMap);
       return buildShowFromCategories({
@@ -424,11 +444,20 @@ export async function fetchSaiChitraTicketNewShows({ date, fetchImpl = fetch }) 
       });
     })
   );
+  const showsBySessionId = new Map();
+  for (const show of shows) {
+    const existing = showsBySessionId.get(show.sessionId);
+    if (!existing || existing.title === "Untitled Movie") {
+      showsBySessionId.set(show.sessionId, show);
+    }
+  }
 
   return {
     theatre: SAI_CHITRA_THEATRE,
     dates: cinemaSessions?.data?.sessionDates || [],
-    shows: shows.sort((left, right) => left.showDateTime.localeCompare(right.showDateTime)),
+    shows: [...showsBySessionId.values()].sort((left, right) =>
+      left.showDateTime.localeCompare(right.showDateTime)
+    ),
     meta: {
       platform: "ticketnew",
       source: "ticketnew-theatre-page",
