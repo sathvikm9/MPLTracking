@@ -108,6 +108,40 @@ function compareShows(left, right) {
   return String(left.theatreShortName || "").localeCompare(String(right.theatreShortName || ""));
 }
 
+function isUntitledTicketNewDuplicate(show) {
+  return (
+    show?.venueCode === "SAIC" &&
+    /^Untitled Movie$/i.test(String(show?.title || show?.releaseLabel || ""))
+  );
+}
+
+function ticketNewSessionDedupeKey(show) {
+  if (show?.venueCode !== "SAIC" || !show?.sessionId) return "";
+  return [show.venueCode, show.sessionId, show.showDateTimeCode || show.showTimeLabel || ""].join("::");
+}
+
+function preferNamedTicketNewShow(existing, candidate) {
+  if (!existing) return candidate;
+  if (isUntitledTicketNewDuplicate(existing) && !isUntitledTicketNewDuplicate(candidate)) return candidate;
+  return existing;
+}
+
+function dedupeTicketNewShows(shows) {
+  const bySession = new Map();
+  const passthrough = [];
+
+  for (const show of shows || []) {
+    const key = ticketNewSessionDedupeKey(show);
+    if (!key) {
+      passthrough.push(show);
+      continue;
+    }
+    bySession.set(key, preferNamedTicketNewShow(bySession.get(key), show));
+  }
+
+  return [...passthrough, ...bySession.values()];
+}
+
 function summarize(shows) {
   const totalShows = shows.length;
   const totalCapacity = shows.reduce((sum, show) => sum + number(show.totalSeats), 0);
@@ -247,7 +281,8 @@ async function fetchLiveTheatreSnapshot({ liveApiBase, date, venueCode, fetchImp
 }
 
 function buildOutput({ date, existing, captures, plannedShows, errors, generatedAt }) {
-  const sortedCaptures = [...captures].sort(compareShows);
+  const sortedCaptures = dedupeTicketNewShows(captures).sort(compareShows);
+  const sortedPlannedShows = dedupeTicketNewShows(plannedShows).sort(compareShows);
 
   return {
     version: 1,
@@ -262,7 +297,7 @@ function buildOutput({ date, existing, captures, plannedShows, errors, generated
     theatres: summarizeByTheatre(sortedCaptures),
     movies: summarizeByMovie(sortedCaptures),
     captures: sortedCaptures,
-    plannedShows: [...plannedShows].sort(compareShows),
+    plannedShows: sortedPlannedShows,
     meta: {
       status: errors.length ? "partial" : "ok",
       source: "vercel-scheduled-boxoffice",
