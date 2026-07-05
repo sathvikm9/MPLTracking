@@ -137,6 +137,40 @@ function boxofficeGrossLabel(show) {
     : currency(showGross(show));
 }
 
+function isUntitledTicketNewDuplicate(show) {
+  return (
+    show?.venueCode === "SAIC" &&
+    /^Untitled Movie$/i.test(String(show?.title || show?.releaseLabel || ""))
+  );
+}
+
+function ticketNewSessionDedupeKey(show) {
+  if (show?.venueCode !== "SAIC" || !show?.sessionId) return "";
+  return [show.venueCode, show.sessionId, show.showDateTimeCode || show.showTimeLabel || ""].join("::");
+}
+
+function preferNamedTicketNewShow(existing, candidate) {
+  if (!existing) return candidate;
+  if (isUntitledTicketNewDuplicate(existing) && !isUntitledTicketNewDuplicate(candidate)) return candidate;
+  return existing;
+}
+
+function dedupeTicketNewShows(shows) {
+  const bySession = new Map();
+  const passthrough = [];
+
+  for (const show of shows || []) {
+    const key = ticketNewSessionDedupeKey(show);
+    if (!key) {
+      passthrough.push(show);
+      continue;
+    }
+    bySession.set(key, preferNamedTicketNewShow(bySession.get(key), show));
+  }
+
+  return [...passthrough, ...bySession.values()];
+}
+
 function blockedBreakdown(show) {
   const categories = Array.isArray(show.categories) ? show.categories : [];
   const parts = categories
@@ -1629,14 +1663,16 @@ function BoxofficeScreen({ screenSwitcher }) {
   const [selectedDate, setSelectedDate] = React.useState(getIndiaTodayIso);
   const { loading, refreshing, error, data, refresh } = useBoxofficeData(selectedDate);
   const isBusy = loading || refreshing;
-  const captures = [...(data?.captures || [])].sort(compareShows);
-  const plannedShows = [...(data?.plannedShows || [])].sort(compareShows);
-  const summary = data?.summary || buildSummaryFromShows([]);
-  const theatres = data?.theatres || [];
-  const movies = data?.movies || [];
+  const captures = dedupeTicketNewShows(data?.captures || []).sort(compareShows);
+  const plannedShows = dedupeTicketNewShows(data?.plannedShows || []).sort(compareShows);
   const bfilmyFallback = data?.meta?.bfilmyFallback;
   const usingBfilmyFallback = Boolean(bfilmyFallback?.used);
   const visibleCaptures = usingBfilmyFallback ? [] : captures;
+  const summary = usingBfilmyFallback
+    ? data?.summary || buildSummaryFromShows([])
+    : buildSummaryFromShows(visibleCaptures);
+  const theatres = usingBfilmyFallback ? data?.theatres || [] : summarizeTheatresFromShows(visibleCaptures);
+  const movies = usingBfilmyFallback ? data?.movies || [] : summarizeMoviesFromShows(visibleCaptures);
   const hasBoxofficeSummary = visibleCaptures.length || number(summary.totalShows) > 0;
   const isPartialCapture = data?.meta?.status === "partial" && !usingBfilmyFallback;
   const plannedCount = plannedShows.length;
