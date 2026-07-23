@@ -411,6 +411,32 @@ function getIndiaTodayIso() {
   }).format(new Date());
 }
 
+function formatBfilmyUpdatedAt(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return "Not loaded yet";
+
+  const match = raw.match(
+    /^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})(?::(\d{2}))?\s*(?:IST)?$/i
+  );
+  if (!match) return raw;
+
+  const [, year, month, day, hour, minute, second = "00"] = match;
+  const date = new Date(
+    `${year}-${month}-${day}T${hour}:${minute}:${second}+05:30`
+  );
+  if (!Number.isFinite(date.getTime())) return raw;
+
+  return `${new Intl.DateTimeFormat("en-IN", {
+    timeZone: INDIA_TIMEZONE,
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true
+  }).format(date)} IST`;
+}
+
 function formatDateButtonParts(isoDate) {
   const date = new Date(`${isoDate}T00:00:00+05:30`);
   return {
@@ -1991,7 +2017,7 @@ function BfilmyScreen({ screenSwitcher }) {
           </div>
           <div className="meta-pill">
             <span>BFilmy Updated</span>
-            <strong>{data?.meta?.lastUpdated || "Not loaded yet"}</strong>
+            <strong>{formatBfilmyUpdatedAt(data?.meta?.lastUpdated)}</strong>
             <small>{data ? "From finalsummary.json" : "Waiting for BFilmy feed"}</small>
           </div>
           <div className="meta-pill">
