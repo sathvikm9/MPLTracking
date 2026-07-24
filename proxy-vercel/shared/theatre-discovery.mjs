@@ -316,8 +316,15 @@ async function readTheatrePage({ theatre, dateIso, days }) {
       }
     );
 
-    if (/Attention Required|blocked/i.test(result.title || result.bodyText || "")) {
-      throw new Error("BookMyShow theatre page was blocked by Cloudflare.");
+    const pageText = `${result.title || ""}\n${result.bodyText || ""}`;
+    if (
+      /Attention Required|Just a moment|Checking your browser|Enable JavaScript and cookies|blocked by Cloudflare/i.test(
+        pageText
+      )
+    ) {
+      throw new Error(
+        `BookMyShow theatre page was challenged by Cloudflare (${result.title || "unknown title"}).`
+      );
     }
 
     return {
