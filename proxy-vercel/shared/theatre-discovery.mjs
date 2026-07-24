@@ -1,6 +1,6 @@
 import { chromium as playwrightChromium } from "playwright-core";
 
-const CITY_SLUG = "madanapalle";
+const CITY_SLUG = "mdnp";
 const INDIA_TIMEZONE = "Asia/Kolkata";
 const THEATRE_DISCOVERY_TIMEOUT_MS = 45000;
 const THEATRE_CACHE_MAX_AGE_MS = 1000 * 60 * 60 * 6;

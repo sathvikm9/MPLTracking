@@ -711,7 +711,7 @@ function buildOutput(config, targetDate, shows, notes = []) {
 
 export async function collectLiveData(targetDate, options = {}) {
   const config = await loadConfig();
-  const citySlug = config.city.slug;
+  const citySlug = config.city.bmsSlug || config.city.slug;
   const theatres = options.theatre
     ? config.theatres.filter((theatre) => theatre.venueCode === options.theatre)
     : config.theatres.filter((theatre) => theatre.active !== false);
