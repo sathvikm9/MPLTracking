@@ -2,41 +2,15 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { chromium } from "playwright";
 
-import {
-  dateCodeToIsoTimestamp,
-  formatGeneratedAt,
-  inferCutoffIso,
-  toIsoFromDateCode
-} from "./date.mjs";
+import { formatGeneratedAt } from "./date.mjs";
+import { discoverTheatreDateShows } from "../../proxy-vercel/shared/theatre-discovery.mjs";
 
 const ROOT = process.cwd();
 const CONFIG_PATH = path.join(ROOT, "config", "city.json");
 const OUTPUT_PATH = path.join(ROOT, "public", "data", "latest.json");
 const HISTORY_DIR = path.join(ROOT, "public", "data", "history");
-const SHOWTIME_API_BASE_URLS = [
-  "https://bms-india.vercel.app/api/showtimes",
-  "https://bms-india2.vercel.app/api/showtimes",
-  "https://bms-india3.vercel.app/api/showtimes"
-];
-const SHOWTIME_API_HEADERS = {
-  accept: "application/json, text/plain, */*",
-  origin: "https://boxoffice24.pages.dev",
-  referer: "https://boxoffice24.pages.dev/",
-  "user-agent":
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36"
-};
 const BMS_BROWSER_USER_AGENT =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36";
-
-function normalizeMovieGenres(eventGenre) {
-  if (!eventGenre) return [];
-  if (Array.isArray(eventGenre)) return eventGenre;
-  if (typeof eventGenre === "string") return eventGenre.split("|").filter(Boolean);
-  if (typeof eventGenre === "object") {
-    return Object.keys(eventGenre).filter((key) => key !== "GenreMeta");
-  }
-  return [];
-}
 
 function categoryKeyFromLabel(label) {
   return label.replace(/\s*-\s*₹.*$/, "").trim();
@@ -54,14 +28,6 @@ function toNumber(value) {
   const cleaned = String(value).replace(/[^\d.-]/g, "");
   const parsed = Number(cleaned);
   return Number.isFinite(parsed) ? parsed : 0;
-}
-
-function buildBookingUrl(citySlug, theatre, dateCode) {
-  return `https://in.bookmyshow.com/cinemas/${citySlug}/${theatre.slug}/buytickets/${theatre.venueCode}/${dateCode}`;
-}
-
-function buildSeatLayoutUrl(citySlug, eventCode, venueCode, sessionId, dateCode) {
-  return `https://in.bookmyshow.com/movies/${citySlug}/seat-layout/${eventCode}/${venueCode}/${sessionId}/${dateCode}`;
 }
 
 function normalizeAvailabilityCategories(rawCategories) {
@@ -138,185 +104,6 @@ function buildSnapshotFromCategories(show, categories, method) {
       capturedAt: new Date().toISOString()
     }
   };
-}
-
-async function fetchShowtimeApiPayload(eventCode, regionCode, dateCode) {
-  let lastError = null;
-
-  for (const baseUrl of SHOWTIME_API_BASE_URLS) {
-    try {
-      const url = new URL(baseUrl);
-      url.searchParams.set("eventCode", eventCode);
-      url.searchParams.set("regionCode", regionCode);
-      url.searchParams.set("dateCode", dateCode);
-
-      const response = await fetch(url, {
-        headers: SHOWTIME_API_HEADERS
-      });
-
-      const payload = await response.text();
-      if (!response.ok) {
-        throw new Error(`${response.status} ${response.statusText}: ${payload.slice(0, 200)}`);
-      }
-
-      const parsed = JSON.parse(payload);
-      if (!Array.isArray(parsed?.ShowDetails)) {
-        throw new Error("Missing ShowDetails in showtime payload");
-      }
-
-      return parsed;
-    } catch (error) {
-      lastError = error;
-    }
-  }
-
-  throw lastError || new Error(`Unable to fetch showtime payload for ${eventCode}`);
-}
-
-function buildApiSnapshotsFromPayload(config, payload, theatreMap, citySlug) {
-  const snapshots = [];
-  const showDetails = Array.isArray(payload?.ShowDetails) ? payload.ShowDetails : [];
-
-  for (const showDetail of showDetails) {
-    const childEvents = Array.isArray(showDetail?.Event?.ChildEvents) ? showDetail.Event.ChildEvents : [];
-    const childEventsByCode = new Map(
-      childEvents
-        .filter((childEvent) => childEvent?.EventCode)
-        .map((childEvent) => [childEvent.EventCode, childEvent])
-    );
-    const venues = Array.isArray(showDetail?.Venues) ? showDetail.Venues : [];
-
-    for (const venue of venues) {
-      const theatre = theatreMap.get(venue?.VenueCode);
-      if (!theatre) continue;
-
-      const showTimes = Array.isArray(venue?.ShowTimes) ? venue.ShowTimes : [];
-      for (const showTime of showTimes) {
-        const childEvent =
-          childEventsByCode.get(showTime.EventCode) || childEvents[0] || showDetail?.Event || {};
-        const categories = normalizeAvailabilityCategories(showTime.Categories);
-
-        if (!hasAvailabilityMetrics(categories)) {
-          continue;
-        }
-
-        const show = {
-          id: `${theatre.venueCode}-${showTime.SessionId}`,
-          eventCode: showTime.EventCode || childEvent.EventCode,
-          sessionId: showTime.SessionId,
-          venueCode: theatre.venueCode,
-          venueName: theatre.name,
-          theatreShortName: theatre.shortName,
-          citySlug,
-          showDate: toIsoFromDateCode(showTime.ShowDateCode || showDetail.Date),
-          showDateCode: showTime.ShowDateCode || showDetail.Date,
-          showDateTime: dateCodeToIsoTimestamp(showTime.ShowDateTime),
-          showDateTimeCode: showTime.ShowDateTime,
-          showTimeLabel: showTime.ShowTime,
-          cutoffAt: inferCutoffIso(
-            showTime.ShowDateTime,
-            showTime.CutOffDateTime,
-            theatre.fallbackCutoffMinutes
-          ),
-          cutoffCode: showTime.CutOffDateTime || null,
-          format: childEvent.EventDimension || "",
-          language: childEvent.EventLang || "",
-          title:
-            childEvent.EventName ||
-            childEvent.EventTitle ||
-            showDetail?.Event?.EventTitle ||
-            "Untitled Movie",
-          releaseLabel: showDetail?.Event?.EventTitle || childEvent.EventTitle || "",
-          censor: childEvent.EventCensor || "",
-          genres: normalizeMovieGenres(childEvent.EventGenre || showDetail?.Event?.EventGenre),
-          trailerUrl: childEvent.TrailerUrl || childEvent.EventTrailer || "",
-          screenName: showTime.ScreenName || theatre.shortName,
-          bookingUrl: buildBookingUrl(citySlug, theatre, showTime.ShowDateCode || showDetail.Date),
-          seatLayoutUrl: buildSeatLayoutUrl(
-            citySlug,
-            showTime.EventCode || childEvent.EventCode,
-            theatre.venueCode,
-            showTime.SessionId,
-            showTime.ShowDateCode || showDetail.Date
-          )
-        };
-
-        snapshots.push(buildSnapshotFromCategories(show, categories, "bms-india-showtimes"));
-      }
-    }
-  }
-
-  return snapshots;
-}
-
-function buildFallbackSnapshots(discoveredShows) {
-  return discoveredShows
-    .map((show) => {
-      const categories = normalizeAvailabilityCategories(show.rawCategories);
-
-      if (hasAvailabilityMetrics(categories)) {
-        return buildSnapshotFromCategories(show, categories, "bookmyshow-theatre-discovery");
-      }
-
-      return buildSnapshotFromCategories(
-        show,
-        normalizeDiscoveredCategories(show.rawCategories),
-        "bookmyshow-showtime-discovery"
-      );
-    });
-}
-
-function collectShowsFromTransformedData(theatre, transformed, dateCode, citySlug) {
-  const eventBlocks = Array.isArray(transformed?.Event) ? transformed.Event : [];
-  const shows = [];
-
-  for (const eventBlock of eventBlocks) {
-    const childEvents = Array.isArray(eventBlock.ChildEvents) ? eventBlock.ChildEvents : [];
-
-    for (const childEvent of childEvents) {
-      const showTimes = Array.isArray(childEvent.ShowTimes) ? childEvent.ShowTimes : [];
-
-      for (const showTime of showTimes) {
-        const eventCode = childEvent.EventCode;
-        const sessionId = showTime.SessionId;
-        const categories = Array.isArray(showTime.Categories) ? showTime.Categories : [];
-
-        shows.push({
-          id: `${theatre.venueCode}-${sessionId}`,
-          eventCode,
-          sessionId,
-          venueCode: theatre.venueCode,
-          venueName: theatre.name,
-          theatreShortName: theatre.shortName,
-          citySlug,
-          showDate: toIsoFromDateCode(showTime.ShowDateCode || dateCode),
-          showDateCode: showTime.ShowDateCode || dateCode,
-          showDateTime: dateCodeToIsoTimestamp(showTime.ShowDateTime),
-          showDateTimeCode: showTime.ShowDateTime,
-          showTimeLabel: showTime.ShowTime,
-          cutoffAt: inferCutoffIso(
-            showTime.ShowDateTime,
-            showTime.CutOffDateTime,
-            theatre.fallbackCutoffMinutes
-          ),
-          cutoffCode: showTime.CutOffDateTime || null,
-          format: childEvent.EventDimension || "",
-          language: childEvent.EventLang || "",
-          title: childEvent.EventName || childEvent.EventTitle || eventBlock.EventTitle,
-          releaseLabel: eventBlock.EventTitle,
-          censor: childEvent.EventCensor || "",
-          genres: normalizeMovieGenres(childEvent.EventGenre),
-          trailerUrl: childEvent.EventTrailer || childEvent.TrailerUrl || "",
-          screenName: showTime.ScreenName || theatre.shortName,
-          bookingUrl: buildBookingUrl(citySlug, theatre, dateCode),
-          seatLayoutUrl: buildSeatLayoutUrl(citySlug, eventCode, theatre.venueCode, sessionId, dateCode),
-          rawCategories: categories
-        });
-      }
-    }
-  }
-
-  return shows;
 }
 
 async function openAccessibilityModal(page) {
@@ -691,7 +478,7 @@ export async function collectSampleData(targetDate) {
   ]);
 }
 
-function buildOutput(config, targetDate, shows, notes = []) {
+function buildOutput(config, targetDate, shows, notes = [], meta = {}) {
   return {
     version: 1,
     generatedAt: new Date().toISOString(),
@@ -705,18 +492,25 @@ function buildOutput(config, targetDate, shows, notes = []) {
     theatres: summarizeByTheatre(shows),
     shows: shows.sort((left, right) => left.showDateTime.localeCompare(right.showDateTime)),
     meta: {
-      status: "ok",
-      notes
+      status: meta.status || "ok",
+      notes,
+      ...meta
     }
   };
 }
 
 export async function collectLiveData(targetDate, options = {}) {
   const config = await loadConfig();
-  const citySlug = config.city.bmsSlug || config.city.slug;
-  const theatres = options.theatre
-    ? config.theatres.filter((theatre) => theatre.venueCode === options.theatre)
-    : config.theatres.filter((theatre) => theatre.active !== false);
+  const theatres = config.theatres.filter(
+    (theatre) =>
+      theatre.active !== false &&
+      theatre.platform !== "ticketnew" &&
+      (!options.theatre || theatre.venueCode === options.theatre)
+  );
+
+  if (options.theatre && theatres.length === 0) {
+    throw new Error(`Unknown or non-BookMyShow theatre: ${options.theatre}`);
+  }
 
   const launchOptions = {
     headless: process.env.BMS_HEADLESS === "true",
@@ -725,111 +519,148 @@ export async function collectLiveData(targetDate, options = {}) {
   };
   const discoveredShows = [];
   const notes = [];
-  const theatreMap = new Map(theatres.map((theatre) => [theatre.venueCode, theatre]));
 
   for (const theatre of theatres) {
-    let discoveryBrowser = null;
-    let discoveryContext = null;
-    let discoveryPage = null;
     try {
-      discoveryBrowser = await chromium.launch(launchOptions);
-      discoveryContext = await discoveryBrowser.newContext({
-        viewport: { width: 1440, height: 1080 },
-        userAgent: BMS_BROWSER_USER_AGENT
+      const discovered = await discoverTheatreDateShows({
+        venueCode: theatre.venueCode,
+        date: targetDate.isoDate,
+        days: 3
       });
-      discoveryPage = await discoveryContext.newPage();
-      const bookingUrl = buildBookingUrl(citySlug, theatre, targetDate.dateCode);
-      await discoveryPage.goto(bookingUrl, {
-        waitUntil: "domcontentloaded",
-        timeout: 60000
-      });
-      await discoveryPage.waitForTimeout(2500);
 
-      await discoveryPage.waitForFunction(
-        ({ venueCode, dateCode }) => {
-          const queries = window.__INITIAL_STATE__?.venueShowtimesFunctionalApi?.queries || {};
-          return Object.keys(queries).some(
-            (queryKey) =>
-              queryKey.includes("getShowtimesByVenue") &&
-              queryKey.includes(venueCode) &&
-              queryKey.includes(dateCode)
-          );
-        },
-        {
-          venueCode: theatre.venueCode,
-          dateCode: targetDate.dateCode
-        },
-        { timeout: 30000 }
-      );
-
-      const transformed = await discoveryPage.evaluate(
-        ({ venueCode, dateCode }) => {
-          const queries = window.__INITIAL_STATE__?.venueShowtimesFunctionalApi?.queries || {};
-          const key = Object.keys(queries).find(
-            (queryKey) =>
-              queryKey.includes("getShowtimesByVenue") &&
-              queryKey.includes(venueCode) &&
-              queryKey.includes(dateCode)
-          );
-          return key ? queries[key]?.data?.showDetailsTransformed || null : null;
-        },
-        {
-          venueCode: theatre.venueCode,
-          dateCode: targetDate.dateCode
-        }
-      );
-
-      if (!transformed) {
-        notes.push(`No showtime payload found for ${theatre.shortName}.`);
-        continue;
+      if (discovered.targetDate !== targetDate.isoDate) {
+        throw new Error(
+          `BookMyShow returned ${discovered.targetDate} instead of ${targetDate.isoDate}`
+        );
       }
 
-      discoveredShows.push(
-        ...collectShowsFromTransformedData(theatre, transformed, targetDate.dateCode, citySlug)
-      );
+      if (discovered.meta?.cache?.hit) {
+        notes.push(
+          `${theatre.shortName} show discovery used a cached response from ${discovered.meta.cache.cachedAt}.`
+        );
+      }
+
+      if (!discovered.shows.length) {
+        notes.push(
+          `${theatre.shortName} returned 0 BookMyShow shows for ${targetDate.isoDate} (${discovered.meta?.pageTitle || "unknown page title"}).`
+        );
+      }
+
+      discoveredShows.push(...discovered.shows);
     } catch (error) {
       notes.push(`Failed to discover shows for ${theatre.shortName}: ${error.message}`);
-    } finally {
-      await discoveryPage?.close().catch(() => {});
-      await discoveryContext?.close().catch(() => {});
-      await discoveryBrowser?.close().catch(() => {});
     }
   }
 
   if (!discoveredShows.length) {
     notes.push("No shows were discovered for the requested theatre set.");
+    return buildOutput(config, targetDate, [], notes, {
+      status: "error",
+      discovery: {
+        requestedTheatres: theatres.length,
+        discoveredTheatres: 0,
+        discoveredShows: 0
+      },
+      availability: {
+        capturedShows: 0,
+        missingShows: 0
+      }
+    });
   }
 
   const snapshotsById = new Map();
-  for (const snapshot of buildFallbackSnapshots(discoveredShows)) {
-    snapshotsById.set(snapshot.id, snapshot);
+  for (const show of discoveredShows) {
+    const categories = normalizeAvailabilityCategories(show.rawCategories);
+    if (hasAvailabilityMetrics(categories)) {
+      snapshotsById.set(
+        show.id,
+        buildSnapshotFromCategories(show, categories, "bookmyshow-theatre-discovery")
+      );
+    }
   }
 
-  const uniqueEventCodes = [...new Set(discoveredShows.map((show) => show.eventCode).filter(Boolean))];
-  for (const eventCode of uniqueEventCodes) {
-    try {
-      const payload = await fetchShowtimeApiPayload(
-        eventCode,
-        config.city.regionCode,
-        targetDate.dateCode
-      );
+  const showsNeedingSeatCapture = discoveredShows.filter((show) => !snapshotsById.has(show.id));
+  let browser = null;
 
-      for (const snapshot of buildApiSnapshotsFromPayload(config, payload, theatreMap, citySlug)) {
-        snapshotsById.set(snapshot.id, snapshot);
+  if (showsNeedingSeatCapture.length) {
+    try {
+      browser = await chromium.launch(launchOptions);
+
+      for (const show of showsNeedingSeatCapture) {
+        let lastError = null;
+
+        for (let attempt = 1; attempt <= 2; attempt += 1) {
+          let context = null;
+          let page = null;
+          try {
+            context = await browser.newContext({
+              viewport: { width: 1440, height: 1080 },
+              userAgent: BMS_BROWSER_USER_AGENT
+            });
+            page = await context.newPage();
+
+            const snapshot = await collectShowSnapshot(page, show);
+            if (!snapshot.totalSeats) {
+              throw new Error("seat layout returned no seats");
+            }
+            snapshotsById.set(snapshot.id, snapshot);
+            lastError = null;
+            break;
+          } catch (error) {
+            lastError = error;
+            if (attempt < 2) {
+              await new Promise((resolve) => setTimeout(resolve, 1000));
+            }
+          } finally {
+            await page?.close().catch(() => {});
+            await context?.close().catch(() => {});
+          }
+        }
+
+        if (lastError) {
+          notes.push(
+            `Failed to capture live seats for ${show.theatreShortName} ${show.showTimeLabel} after 2 attempts: ${lastError.message}`
+          );
+        }
       }
     } catch (error) {
-      notes.push(`Showtime API fallback failed for ${eventCode}: ${error.message}`);
+      notes.push(`Failed to start the BookMyShow seat collector: ${error.message}`);
+    } finally {
+      await browser?.close().catch(() => {});
     }
   }
 
   const missingShows = discoveredShows.filter((show) => !snapshotsById.has(show.id));
   if (missingShows.length) {
     notes.push(
-      `No live availability payload was captured for ${missingShows.length} discovered show(s).`
+      `Live seat availability is missing for ${missingShows.length} of ${discoveredShows.length} discovered show(s).`
     );
   }
 
-  return buildOutput(config, targetDate, Array.from(snapshotsById.values()), notes);
+  for (const show of missingShows) {
+    snapshotsById.set(
+      show.id,
+      buildSnapshotFromCategories(
+        show,
+        normalizeDiscoveredCategories(show.rawCategories),
+        "bookmyshow-showtime-discovery"
+      )
+    );
+  }
+
+  const discoveredTheatres = new Set(discoveredShows.map((show) => show.venueCode)).size;
+  return buildOutput(config, targetDate, Array.from(snapshotsById.values()), notes, {
+    status: missingShows.length ? "partial" : "ok",
+    discovery: {
+      requestedTheatres: theatres.length,
+      discoveredTheatres,
+      discoveredShows: discoveredShows.length
+    },
+    availability: {
+      capturedShows: discoveredShows.length - missingShows.length,
+      missingShows: missingShows.length
+    }
+  });
 }
 
 export async function writeOutput(data) {

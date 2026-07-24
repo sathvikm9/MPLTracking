@@ -12,13 +12,28 @@ async function preserveLastNonEmptySnapshot(data) {
   try {
     const existing = JSON.parse(await fs.readFile(STATIC_LATEST_PATH, "utf8"));
     if (Number(existing?.summary?.totalShows || 0) <= 0) return data;
+    if (existing.targetDate !== data.targetDate) {
+      return {
+        ...data,
+        meta: {
+          ...(data.meta || {}),
+          notes: [
+            ...((data.meta && data.meta.notes) || []),
+            `The last non-empty snapshot is for ${existing.targetDate}; it was not reused for ${data.targetDate}.`
+          ]
+        }
+      };
+    }
 
     return {
       ...existing,
+      generatedAt: data.generatedAt,
+      generatedAtLabel: data.generatedAtLabel,
       meta: {
         ...(existing.meta || {}),
+        status: "stale",
         notes: [
-          `Scheduled collector found 0 shows for ${data.targetDate}; preserved the last non-empty static snapshot so Pages can still publish boxoffice captures.`,
+          `Scheduled collector found 0 shows for ${data.targetDate}; preserved the previous snapshot for the same date.`,
           ...((existing.meta && existing.meta.notes) || [])
         ]
       }
