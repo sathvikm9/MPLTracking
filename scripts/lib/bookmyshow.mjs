@@ -742,7 +742,19 @@ export async function collectLiveData(targetDate, options = {}) {
       });
 
       await discoveryPage.waitForFunction(
-        () => !!window.__INITIAL_STATE__?.venueShowtimesFunctionalApi?.queries,
+        ({ venueCode, dateCode }) => {
+          const queries = window.__INITIAL_STATE__?.venueShowtimesFunctionalApi?.queries || {};
+          return Object.keys(queries).some(
+            (queryKey) =>
+              queryKey.includes("getShowtimesByVenue") &&
+              queryKey.includes(venueCode) &&
+              queryKey.includes(dateCode)
+          );
+        },
+        {
+          venueCode: theatre.venueCode,
+          dateCode: targetDate.dateCode
+        },
         { timeout: 30000 }
       );
 
@@ -750,7 +762,10 @@ export async function collectLiveData(targetDate, options = {}) {
         ({ venueCode, dateCode }) => {
           const queries = window.__INITIAL_STATE__?.venueShowtimesFunctionalApi?.queries || {};
           const key = Object.keys(queries).find(
-            (queryKey) => queryKey.includes(venueCode) && queryKey.includes(dateCode)
+            (queryKey) =>
+              queryKey.includes("getShowtimesByVenue") &&
+              queryKey.includes(venueCode) &&
+              queryKey.includes(dateCode)
           );
           return key ? queries[key]?.data?.showDetailsTransformed || null : null;
         },
