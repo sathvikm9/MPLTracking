@@ -25,6 +25,8 @@ const SHOWTIME_API_HEADERS = {
   "user-agent":
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36"
 };
+const BMS_BROWSER_USER_AGENT =
+  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36";
 
 function normalizeMovieGenres(eventGenre) {
   if (!eventGenre) return [];
@@ -732,7 +734,8 @@ export async function collectLiveData(targetDate, options = {}) {
     try {
       discoveryBrowser = await chromium.launch(launchOptions);
       discoveryContext = await discoveryBrowser.newContext({
-        viewport: { width: 1440, height: 1080 }
+        viewport: { width: 1440, height: 1080 },
+        userAgent: BMS_BROWSER_USER_AGENT
       });
       discoveryPage = await discoveryContext.newPage();
       const bookingUrl = buildBookingUrl(citySlug, theatre, targetDate.dateCode);
@@ -740,6 +743,7 @@ export async function collectLiveData(targetDate, options = {}) {
         waitUntil: "domcontentloaded",
         timeout: 60000
       });
+      await discoveryPage.waitForTimeout(2500);
 
       await discoveryPage.waitForFunction(
         ({ venueCode, dateCode }) => {
